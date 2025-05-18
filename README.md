@@ -6,7 +6,7 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 
 | Main UI | Settings | Profiles |
 |--------|----------|----------|
-| ![Main UI](https://raw.githubusercontent.com/ErisuGreyrat/Private-Images/refs/heads/main/CustomBackgroundPreview%20(2).png?token=GHSAT0AAAAAAC4RZXLN3HQAFDG5FJSYFQCQ2BJHXVQ) | ![Settings](https://raw.githubusercontent.com/ErisuGreyrat/Private-Images/refs/heads/main/CustomBackgroundPreview%20(4).png?token=GHSAT0AAAAAAC4RZXLNFKOGUYXGWZQZ2HPE2BJHXGQ) | ![Profiles](https://raw.githubusercontent.com/ErisuGreyrat/Private-Images/refs/heads/main/CustomBackgroundPreview%20(3).png?token=GHSAT0AAAAAAC4RZXLMI64OQ56HTEM6L3WA2BJHVTA) |
+| ![Main UI](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(2).png) | ![Settings](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(4).png) | ![Profiles](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(3).png) |
 
 ## Features
 
