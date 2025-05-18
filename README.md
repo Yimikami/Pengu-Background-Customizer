@@ -1,6 +1,6 @@
 # Background Customizer
 
-A Pengu Loader plugin to customize the League of Legends client with dynamic backgrounds. Built by [ErisuGreyrat](https://github.com/ErisuGreyrat). Best used with my [Acrylic League Theme](https://github.com/ErisuGreyrat/acrylic-league-theme).
+A Pengu Loader plugin to customize the League of Legends client with dynamic backgrounds. Built by [Erisu](https://github.com/ErisuGreyrat). Best used with my [Acrylic League Theme](https://github.com/ErisuGreyrat/acrylic-league-theme).
 
 ## Screenshots
 
@@ -34,7 +34,7 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 ## Usage
 
 - **Open**: In the lobby, click the “BGC” button (hover left to reveal).
-- **Choose Background**: Search or filter skins, click to preview, and select “Confirm”.
+- **Choose Background**: Search or filter skins, select and press “Confirm”.
 - **Settings**: Click the cog icon to adjust opacity, transitions, or enable auto-cycling.
 - **Profiles**: Use the “PROFILES” button to save or load skin sets.
 - **Shuffle**: Click “Shuffle” for a random background or enable cycling in settings.
@@ -42,7 +42,7 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 ## Compatibility
 
 - **Pengu Loader**: Latest version.
-- **League Client**: Tested on PBE and live clients (May 2025).
+- **League Client**: Tested on live client (May 2025).
 - **Acrylic League Theme**: Recommended for enhanced visuals.
 - **Data Source**: [Community Dragon](https://www.communitydragon.org/).
 
