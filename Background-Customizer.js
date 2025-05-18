@@ -4,26 +4,189 @@
 * @link https://github.com/ErisuGreyrat
 */
 
-let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tftData=[],previewGroups=[],backgroundEnabled=!0,currentOpacity=.3,persistBackground=!1,centeredSplash=!0,settingsVisible=!1,cycleShuffleEnabled=!1,cycleInterval=30,currentSearchQuery="",shuffleCycleIntervalId=null,transitionDuration=.5,lastAppliedUrl=null,skinProfiles=[],activeProfile=null,isInitialLoad=!0;function isDataStoreAvailable(){return void 0!==window.DataStore}function saveSettings(){try{let e={backgroundEnabled,currentOpacity,persistBackground,centeredSplash,cycleShuffleEnabled,cycleInterval,transitionDuration,skinProfiles,activeProfile,savedAt:new Date().toISOString()};isDataStoreAvailable()?(DataStore.set("dynamicBg_config",e),console.log("Settings saved:",e)):console.error("DataStore API not available")}catch(t){console.error("Failed to save settings:",t)}}function loadSavedSettings(){try{if(isDataStoreAvailable()){let e=DataStore.get("dynamicBg_config");if(e)return backgroundEnabled=void 0===e.backgroundEnabled||e.backgroundEnabled,currentOpacity=void 0!==e.currentOpacity?parseFloat(e.currentOpacity):.3,persistBackground=void 0!==e.persistBackground&&e.persistBackground,centeredSplash=void 0===e.centeredSplash||e.centeredSplash,cycleShuffleEnabled=void 0!==e.cycleShuffleEnabled&&e.cycleShuffleEnabled,cycleInterval=void 0!==e.cycleInterval?parseInt(e.cycleInterval):30,transitionDuration=void 0!==e.transitionDuration?parseFloat(e.transitionDuration):.5,skinProfiles=void 0!==e.skinProfiles?e.skinProfiles:[],activeProfile=void 0!==e.activeProfile?e.activeProfile:null,console.log("Loaded settings:",{backgroundEnabled,currentOpacity,persistBackground,centeredSplash,cycleShuffleEnabled,cycleInterval,transitionDuration,skinProfiles,activeProfile,savedAt:e.savedAt}),!0}return console.log("No saved settings, using defaults"),!1}catch(t){return console.error("Failed to load settings:",t),!1}}function preloadImage(e){return new Promise(t=>{if(!e)return t();let o=new Image;o.src=e,o.onload=t,o.onerror=()=>{console.warn(`Failed to preload image: ${e}`),t()}})}async function applyBackground(e){let t=document.getElementById("rcp-fe-viewport-root");if(!t||!e||!backgroundEnabled){removeBackground();return}console.log(`Applying background for ${e.name} with opacity: ${currentOpacity}`);let o=centeredSplash?e.splashPath||e.backgroundTextureLCU||e.uncenteredSplashPath:e.uncenteredSplashPath||e.splashPath||e.backgroundTextureLCU;if(o===lastAppliedUrl){let a=document.getElementById("client-bg-container");if(a){let n=a.querySelector(".client-bg-layer:last-child");n&&parseFloat(n.style.opacity)!==currentOpacity&&(n.style.opacity=currentOpacity,console.log(`Updated opacity to ${currentOpacity} for unchanged background: ${e.name}`))}return}await preloadImage(o);let l=document.getElementById("client-bg-container");l||((l=document.createElement("div")).id="client-bg-container",l.style.cssText=`
+let uiVisible = false;
+let debounceTimeout;
+let skinData = [];
+let universeData = [];
+let skinLineData = [];
+let tftData = [];
+let previewGroups = [];
+let backgroundEnabled = true;
+let currentOpacity = 0.3;
+let storedOpacity = currentOpacity;
+let persistBackground = false;
+let centeredSplash = true;
+let settingsVisible = false;
+let cycleShuffleEnabled = false;
+let cycleInterval = 30;
+let currentSearchQuery = '';
+let shuffleCycleIntervalId = null;
+let transitionDuration = 0.5;
+let lastAppliedUrl = null;
+let skinProfiles = [];
+let activeProfile = null;
+let isInitialLoad = true;
+
+
+function isDataStoreAvailable() {
+    return window.DataStore !== undefined;
+}
+
+
+function saveSettings() {
+    try {
+        const configData = {
+            backgroundEnabled,
+            currentOpacity: storedOpacity,
+            persistBackground,
+            centeredSplash,
+            cycleShuffleEnabled,
+            cycleInterval,
+            transitionDuration,
+            skinProfiles,
+            activeProfile,
+            savedAt: new Date().toISOString()
+        };
+        if (isDataStoreAvailable()) {
+            DataStore.set('dynamicBg_config', configData);
+            console.log('Settings saved:', configData);
+        } else {
+            console.error('DataStore API not available');
+        }
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+    }
+}
+
+function loadSavedSettings() {
+    try {
+        if (isDataStoreAvailable()) {
+            const config = DataStore.get('dynamicBg_config');
+            if (config) {
+                backgroundEnabled = config.backgroundEnabled !== undefined ? config.backgroundEnabled : true;
+                storedOpacity = config.currentOpacity !== undefined ? parseFloat(config.currentOpacity) : 0.3;
+                currentOpacity = storedOpacity;
+                persistBackground = config.persistBackground !== undefined ? config.persistBackground : false;
+                centeredSplash = config.centeredSplash !== undefined ? config.centeredSplash : true;
+                cycleShuffleEnabled = config.cycleShuffleEnabled !== undefined ? config.cycleShuffleEnabled : false;
+                cycleInterval = config.cycleInterval !== undefined ? parseInt(config.cycleInterval) : 30;
+                transitionDuration = config.transitionDuration !== undefined ? parseFloat(config.transitionDuration) : 0.5;
+                skinProfiles = config.skinProfiles !== undefined ? config.skinProfiles : [];
+                activeProfile = config.activeProfile !== undefined ? config.activeProfile : null;
+                console.log('Loaded settings:', { 
+                    backgroundEnabled, 
+                    currentOpacity: storedOpacity, 
+                    persistBackground, 
+                    centeredSplash, 
+                    cycleShuffleEnabled, 
+                    cycleInterval, 
+                    transitionDuration,
+                    skinProfiles,
+                    activeProfile,
+                    savedAt: config.savedAt 
+                });
+                return true;
+            }
+        }
+        console.log('No saved settings, using defaults');
+        return false;
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+        return false;
+    }
+}
+
+function preloadImage(url) {
+    return new Promise((resolve) => {
+        if (!url) return resolve();
+        const img = new Image();
+        img.src = url;
+        img.onload = resolve;
+        img.onerror = () => {
+            console.warn(`Failed to preload image: ${url}`);
+            resolve();
+        };
+    });
+}
+
+async function applyBackground(item) {
+    const viewport = document.getElementById('rcp-fe-viewport-root');
+    if (!viewport || !item || !backgroundEnabled) {
+        removeBackground();
+        return;
+    }
+
+    console.log(`Applying background for ${item.name} with opacity: ${currentOpacity}`);
+
+    const splashUrl = centeredSplash 
+        ? (item.splashPath || item.backgroundTextureLCU || item.uncenteredSplashPath)
+        : (item.uncenteredSplashPath || item.splashPath || item.backgroundTextureLCU);
+
+    if (splashUrl === lastAppliedUrl) {
+        const bgContainer = document.getElementById('client-bg-container');
+        if (bgContainer) {
+            const currentLayer = bgContainer.querySelector('.client-bg-layer:last-child');
+            if (currentLayer && parseFloat(currentLayer.style.opacity) !== currentOpacity) {
+                currentLayer.style.opacity = currentOpacity;
+                console.log(`Updated opacity to ${currentOpacity} for unchanged background: ${item.name}`);
+            }
+        }
+        return;
+    }
+
+    await preloadImage(splashUrl);
+
+    let bgContainer = document.getElementById('client-bg-container');
+    if (!bgContainer) {
+        bgContainer = document.createElement('div');
+        bgContainer.id = 'client-bg-container';
+        bgContainer.style.cssText = `
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             z-index: -1;
-        `,t.appendChild(l),t.classList.add("custom-background"));let r=l.querySelectorAll(".client-bg-layer");r.length>1&&r.forEach((e,t)=>{t<r.length-1&&(e.remove(),console.log(`Removed excess layer: ${e.style.backgroundImage}`))});let i=document.createElement("div");i.className="client-bg-layer",i.style.cssText=`
+        `;
+        viewport.appendChild(bgContainer);
+        viewport.classList.add('custom-background');
+    }
+
+    const existingLayers = bgContainer.querySelectorAll('.client-bg-layer');
+    if (existingLayers.length > 1) {
+        existingLayers.forEach((layer, index) => {
+            if (index < existingLayers.length - 1) {
+                layer.remove();
+                console.log(`Removed excess layer: ${layer.style.backgroundImage}`);
+            }
+        });
+    }
+
+    const newBg = document.createElement('div');
+    newBg.className = 'client-bg-layer';
+    newBg.style.cssText = `
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-image: url('${o}');
+        background-image: url('${splashUrl}');
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         opacity: 0;
         transition: opacity ${transitionDuration}s ease;
-    `,l.appendChild(i);let s=document.getElementById("client-bg-style");s||((s=document.createElement("style")).id="client-bg-style",document.head.appendChild(s)),s.textContent=`
+    `;
+
+    bgContainer.appendChild(newBg);
+
+    let styleElement = document.getElementById('client-bg-style');
+    if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'client-bg-style';
+        document.head.appendChild(styleElement);
+    }
+    styleElement.textContent = `
         .custom-background {
             position: relative;
         }
@@ -38,7 +201,217 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
             background-repeat: no-repeat;
             transition: opacity ${transitionDuration}s ease;
         }
-    `,i.offsetHeight,i.style.opacity=currentOpacity;let d=l.querySelector(".client-bg-layer:not(:last-child)");d&&(d.style.opacity=0,setTimeout(()=>{d.parentNode&&(d.remove(),console.log(`Cleaned up old layer: ${d.style.backgroundImage}`))},1e3*transitionDuration+100)),lastAppliedUrl=o,console.log(`Background applied: ${e.name}, URL: ${o}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`)}function removeBackground(){let e=document.getElementById("rcp-fe-viewport-root");if(e&&e.classList.contains("custom-background")){let t=document.getElementById("client-bg-container");if(t){let o=t.querySelectorAll(".client-bg-layer");o.forEach(e=>{e.style.opacity=0,setTimeout(()=>{e.parentNode&&(e.remove(),console.log(`Removed layer during reset: ${e.style.backgroundImage}`))},1e3*transitionDuration+100)}),setTimeout(()=>{t.parentNode&&(t.remove(),console.log("Removed background container"))},1e3*transitionDuration+100)}e.classList.remove("custom-background"),lastAppliedUrl=null,console.log("Background fully removed")}}function checkAndApplyBackground(){let e=document.getElementById("rcp-fe-viewport-root");if(!e)return;let t=document.querySelector('[data-screen-name="rcp-fe-lol-parties"]'),o=DataStore.get("selectedSkin");backgroundEnabled&&o&&(t||persistBackground)?applyBackground(o):removeBackground()}function checkAndCreateButton(){clearTimeout(debounceTimeout),debounceTimeout=setTimeout(()=>{let e=document.querySelector('[data-screen-name="rcp-fe-lol-parties"]'),t=document.getElementById("client-bg-show-button");if(!e){t&&t.remove();return}t||createShowButton(e)},100)}function createShowButton(e){let t=document.getElementById("client-bg-hover-area");t&&t.remove();let o=document.createElement("div");o.id="client-bg-hover-area",o.style.cssText=`
+    `;
+
+    newBg.offsetHeight;
+
+    newBg.style.opacity = currentOpacity;
+    const oldBg = bgContainer.querySelector('.client-bg-layer:not(:last-child)');
+    if (oldBg) {
+        oldBg.style.opacity = 0;
+        setTimeout(() => {
+            if (oldBg.parentNode) {
+                oldBg.remove();
+                console.log(`Cleaned up old layer: ${oldBg.style.backgroundImage}`);
+            }
+        }, transitionDuration * 1000 + 100);
+    }
+
+    lastAppliedUrl = splashUrl;
+    console.log(`Background applied: ${item.name}, URL: ${splashUrl}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`);
+}
+
+function removeBackground() {
+    const viewport = document.getElementById('rcp-fe-viewport-root');
+    if (viewport && viewport.classList.contains('custom-background')) {
+        const bgContainer = document.getElementById('client-bg-container');
+        if (bgContainer) {
+            const layers = bgContainer.querySelectorAll('.client-bg-layer');
+            layers.forEach(layer => {
+                layer.style.opacity = 0;
+                setTimeout(() => {
+                    if (layer.parentNode) {
+                        layer.remove();
+                        console.log(`Removed layer during reset: ${layer.style.backgroundImage}`);
+                    }
+                }, transitionDuration * 1000 + 100);
+            });
+            setTimeout(() => {
+                if (bgContainer.parentNode) {
+                    bgContainer.remove();
+                    console.log('Removed background container');
+                }
+            }, transitionDuration * 1000 + 100);
+        }
+        viewport.classList.remove('custom-background');
+        lastAppliedUrl = null;
+        console.log('Background fully removed');
+    }
+}
+
+function checkAndApplyBackground() {
+    const viewport = document.getElementById('rcp-fe-viewport-root');
+    if (!viewport) return;
+
+    const partiesScreen = document.querySelector('[data-screen-name="rcp-fe-lol-parties"]');
+    const activityCenterScreen = document.querySelector('.screen-root.active[data-screen-name="rcp-fe-lol-activity-center"]');
+    const savedItem = DataStore.get('selectedSkin');
+
+    if (activityCenterScreen && getComputedStyle(activityCenterScreen).opacity === '1') {
+        currentOpacity = 0;
+    } else {
+        currentOpacity = storedOpacity;
+    }
+
+    if (backgroundEnabled && savedItem && (partiesScreen || persistBackground)) {
+        applyBackground(savedItem);
+    } else {
+        removeBackground();
+    }
+}
+
+function setupActivityCenterObserver() {
+    const activityCenterScreen = document.querySelector('.screen-root.active[data-screen-name="rcp-fe-lol-activity-center"]');
+    if (!activityCenterScreen) {
+        console.log('Activity center not found for observer setup');
+        return;
+    }
+
+    const observer = new MutationObserver(() => {
+        checkAndApplyBackground();
+    });
+
+    observer.observe(activityCenterScreen, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+
+    console.log('Activity center observer set up');
+}
+
+
+window.addEventListener('load', () => {
+    console.log('Pengu Loader Client Background Customizer plugin loading...');
+    setupActivityCenterObserver();
+    loadSavedSettings();
+
+    Promise.allSettled([
+        fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/skins.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                skinData = Object.values(data).map(skin => {
+                    const cleanTilePath = skin.tilePath ? skin.tilePath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
+                    const cleanSplashPath = skin.splashPath ? skin.splashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
+                    const cleanUncenteredSplashPath = skin.uncenteredSplashPath ? skin.uncenteredSplashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
+                    return {
+                        ...skin,
+                        tilePath: cleanTilePath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanTilePath}` : '',
+                        splashPath: cleanSplashPath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanSplashPath}` : '',
+                        uncenteredSplashPath: cleanUncenteredSplashPath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanUncenteredSplashPath}` : ''
+                    };
+                });
+                console.log('Fetched skins.json, skinData length:', skinData.length);
+            }),
+        fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/universes.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                universeData = Array.isArray(data) ? data : [];
+                console.log('Fetched universes.json, universeData length:', universeData.length);
+            }),
+        fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/skinlines.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                skinLineData = Array.isArray(data) ? data : [];
+                console.log('Fetched skinlines.json, skinLineData length:', skinLineData.length);
+            }),
+        fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/tftrotationalshopitemdata.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                tftData = Array.isArray(data) ? data : [];
+                tftData = tftData.map(item => {
+                    const cleanBackgroundTexture = item.backgroundTextureLCU ? item.backgroundTextureLCU.replace(/^ASSETS\//i, '').toLowerCase() : '';
+                    const cleanLargeIcon = item.standaloneLoadoutsLargeIcon ? item.standaloneLoadoutsLargeIcon.replace(/^ASSETS\//i, '').toLowerCase() : '';
+                    return {
+                        ...item,
+                        backgroundTextureLCU: cleanBackgroundTexture ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanBackgroundTexture}` : '',
+                        standaloneLoadoutsLargeIcon: cleanLargeIcon ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanLargeIcon}` : '',
+                        isTFT: true
+                    };
+                });
+                console.log('Fetched tftrotationalshopitemdata.json, tftData length:', tftData.length);
+            })
+    ])
+    .then(results => {
+        const errors = results.filter(r => r.status === 'rejected').map(r => r.reason);
+        if (errors.length > 0) {
+            console.error('Errors during data fetch:', errors);
+            alert('Some data failed to load. Falling back to champion grouping.');
+        }
+        generatePreviewGroups('champion');
+        checkAndApplyBackground();
+    })
+    .catch(error => {
+        console.error('Unexpected error during data fetch:', error);
+        alert('Failed to initialize data.');
+    });
+
+    setTimeout(() => {
+        const observer = new MutationObserver(() => {
+            if (!uiVisible) {
+                checkAndCreateButton();
+            }
+            checkAndApplyBackground();
+        });
+
+        const targetNode = document.querySelector('[data-screen-name="rcp-fe-lol-parties"]') || document.body;
+        observer.observe(targetNode, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-screen-name']
+        });
+
+        checkAndCreateButton();
+        checkAndApplyBackground();
+    }, 1000);
+});
+
+function checkAndCreateButton() {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+        const partiesScreen = document.querySelector('[data-screen-name="rcp-fe-lol-parties"]');
+        const showBtn = document.getElementById('client-bg-show-button');
+
+        if (!partiesScreen) {
+            if (showBtn) showBtn.remove();
+            return;
+        }
+
+        if (!showBtn) {
+            createShowButton(partiesScreen);
+        }
+    }, 100);
+}
+
+function createShowButton(container) {
+    const existingHoverArea = document.getElementById('client-bg-hover-area');
+    if (existingHoverArea) existingHoverArea.remove();
+
+    const hoverArea = document.createElement('div');
+    hoverArea.id = 'client-bg-hover-area';
+    hoverArea.style.cssText = `
         position: absolute;
         top: 40%;
         left: 0;
@@ -48,7 +421,13 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         display: flex;
         align-items: center;
         justify-content: center;
-    `;let a=document.createElement("button");a.textContent="BGC",a.id="client-bg-show-button",a.className="lol-custom-ui",a.style.cssText=`
+    `;
+
+    const showButton = document.createElement('button');
+    showButton.textContent = 'BGC';
+    showButton.id = 'client-bg-show-button';
+    showButton.className = 'lol-custom-ui';
+    showButton.style.cssText = `
         padding: 8px 12px;
         z-index: 9999;
         background: #010a13;
@@ -58,7 +437,240 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
         transition: all 0.2s, opacity 0.3s;
         opacity: 0;
-    `,o.addEventListener("mouseenter",()=>{a.style.opacity="1"}),o.addEventListener("mouseleave",()=>{a.style.opacity="0"}),a.addEventListener("mouseenter",()=>{a.style.background="#1e2328",a.style.borderColor="#c8aa6e",a.style.color="#f0e6d2"}),a.addEventListener("mouseleave",()=>{a.style.background="#010a13",a.style.borderColor="#785a28",a.style.color="#cdbe91"}),a.addEventListener("mousedown",()=>{a.style.color="#785a28"}),a.addEventListener("mouseup",()=>{a.style.color="#f0e6d2"}),a.addEventListener("click",()=>{let t=document.getElementById("client-bg-customizer-ui-wrapper");t&&t.remove(),createClientBackgroundCustomizerUI(e),uiVisible=!0,o.remove()}),o.appendChild(a),e.appendChild(o)}function generatePreviewGroups(e){if(console.log("Generating preview groups for type:",e),previewGroups=[],"champion"===e){let t={};skinData.forEach(e=>{if(e.tilePath){let o=e.tilePath.match(/\/Characters\/([^\/]+)\//i);if(o){let a=o[1];t[a]||(t[a]=[]),t[a].push({name:e.name,tilePath:e.tilePath,splashPath:e.splashPath,uncenteredSplashPath:e.uncenteredSplashPath,skinLineId:e.skinLines&&e.skinLines.length>0?e.skinLines[0].id:null})}}});let o=Object.keys(t).map(e=>({title:e,items:t[e]}));o.sort((e,t)=>e.title.localeCompare(t.title)),o.forEach(e=>{e.items.sort((e,t)=>e.name.localeCompare(t.name))}),previewGroups.push(...o)}else if("universes"===e){if(!Array.isArray(universeData)||0===universeData.length||!Array.isArray(skinLineData)||0===skinLineData.length){console.warn("Universe or skinline data unavailable, falling back to champion"),generatePreviewGroups("champion");return}let a={Other:[]},n={},l={};skinLineData.forEach(e=>{e.id&&e.name&&(n[e.id]=e.name)}),universeData.forEach(e=>{e&&"object"==typeof e&&e.name&&Array.isArray(e.skinSets)&&e.skinSets.forEach(t=>{let o=parseInt("object"==typeof t?t.id:t,10);isNaN(o)||(l[o]=e.name)})}),skinData.forEach(e=>{if(!e.tilePath)return;let t=e.skinLines&&e.skinLines.length>0&&null!=e.skinLines[0].id?parseInt(e.skinLines[0].id,10):null,o="Other",r=null;t&&(r=n[t]||`Unknown SkinLine ${t}`,o=l[t]||r),a[o]||(a[o]=[]),a[o].push({name:e.name,tilePath:e.tilePath,splashPath:e.splashPath,uncenteredSplashPath:e.uncenteredSplashPath,skinLineId:t,skinLineName:r})});let r=Object.keys(a).map(e=>({title:e,items:a[e]}));r.sort((e,t)=>e.title.localeCompare(t.title)),r.forEach(e=>{e.items.sort((e,t)=>e.name.localeCompare(t.name))}),previewGroups.push(...r)}else if("skinlines"===e){if(!Array.isArray(skinLineData)||0===skinLineData.length){console.warn("Skinline data unavailable, falling back to champion"),generatePreviewGroups("champion");return}let i={Other:[]},s={};skinLineData.forEach(e=>{e.id&&e.name&&(s[e.id]=e.name)}),skinData.forEach(e=>{if(!e.tilePath)return;let t=e.skinLines&&e.skinLines.length>0&&null!=e.skinLines[0].id?parseInt(e.skinLines[0].id,10):null,o="Other",a=null;t&&(o=a=s[t]||`Unknown SkinLine ${t}`),i[o]||(i[o]=[]),i[o].push({name:e.name,tilePath:e.tilePath,splashPath:e.splashPath,uncenteredSplashPath:e.uncenteredSplashPath,skinLineId:t,skinLineName:a})});let d=Object.keys(i).map(e=>({title:e,items:i[e]}));d.sort((e,t)=>e.title.localeCompare(t.title)),d.forEach(e=>{e.items.sort((e,t)=>e.name.localeCompare(t.name))}),previewGroups.push(...d)}else console.warn("Invalid type, falling back to champion"),generatePreviewGroups("champion");if(!1!==DataStore.get("tftEnabled")&&tftData.length>0){let c={title:"TFT",items:tftData.filter(e=>e.descriptionTraKey&&e.descriptionTraKey.toLowerCase().startsWith("companion")&&e.backgroundTextureLCU).map(e=>({name:e.name,tilePath:e.standaloneLoadoutsLargeIcon,splashPath:e.backgroundTextureLCU,uncenteredSplashPath:e.backgroundTextureLCU,skinLineId:null,skinLineName:null,isTFT:!0}))};c.items.length>0&&(c.items.sort((e,t)=>e.name.localeCompare(t.name)),previewGroups.push(c))}console.log(`Generated ${previewGroups.length} preview groups for type: ${e}`)}function createProfilesUI(e){let t=document.createElement("div");t.id="client-bg-profiles-ui-wrapper",t.style.cssText=`
+    `;
+
+    hoverArea.addEventListener('mouseenter', () => {
+        showButton.style.opacity = '1';
+    });
+
+    hoverArea.addEventListener('mouseleave', () => {
+        showButton.style.opacity = '0';
+    });
+
+    showButton.addEventListener('mouseenter', () => {
+        showButton.style.background = '#1e2328';
+        showButton.style.borderColor = '#c8aa6e';
+        showButton.style.color = '#f0e6d2';
+    });
+
+    showButton.addEventListener('mouseleave', () => {
+        showButton.style.background = '#010a13';
+        showButton.style.borderColor = '#785a28';
+        showButton.style.color = '#cdbe91';
+    });
+
+    showButton.addEventListener('mousedown', () => {
+        showButton.style.color = '#785a28';
+    });
+
+    showButton.addEventListener('mouseup', () => {
+        showButton.style.color = '#f0e6d2';
+    });
+
+    showButton.addEventListener('click', () => {
+        const uiWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+        if (uiWrapper) {
+            uiWrapper.remove();
+        }
+        createClientBackgroundCustomizerUI(container);
+        uiVisible = true;
+        hoverArea.remove();
+    });
+
+    hoverArea.appendChild(showButton);
+    container.appendChild(hoverArea);
+}
+
+function generatePreviewGroups(type) {
+    console.log('Generating preview groups for type:', type);
+    previewGroups = [];
+
+    if (type === 'champion') {
+        const groupedByChampion = {};
+        skinData.forEach(skin => {
+            if (skin.tilePath) {
+                const match = skin.tilePath.match(/\/Characters\/([^\/]+)\//i);
+                if (match) {
+                    const champion = match[1];
+                    if (!groupedByChampion[champion]) {
+                        groupedByChampion[champion] = [];
+                    }
+                    groupedByChampion[champion].push({
+                        name: skin.name,
+                        tilePath: skin.tilePath,
+                        splashPath: skin.splashPath,
+                        uncenteredSplashPath: skin.uncenteredSplashPath,
+                        skinLineId: skin.skinLines && skin.skinLines.length > 0 ? skin.skinLines[0].id : null
+                    });
+                }
+            }
+        });
+
+        const championGroups = Object.keys(groupedByChampion).map(champion => ({
+            title: champion,
+            items: groupedByChampion[champion]
+        }));
+
+        championGroups.sort((a, b) => a.title.localeCompare(b.title));
+        championGroups.forEach(group => {
+            group.items.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        previewGroups.push(...championGroups);
+    } else if (type === 'universes') {
+        if (!Array.isArray(universeData) || universeData.length === 0 || !Array.isArray(skinLineData) || skinLineData.length === 0) {
+            console.warn('Universe or skinline data unavailable, falling back to champion');
+            generatePreviewGroups('champion');
+            return;
+        }
+
+        const groupedByUniverse = { Other: [] };
+        const skinLineToName = {};
+        const skinLineToUniverse = {};
+
+        skinLineData.forEach(skinLine => {
+            if (skinLine.id && skinLine.name) {
+                skinLineToName[skinLine.id] = skinLine.name;
+            }
+        });
+
+        universeData.forEach(universe => {
+            if (!universe || typeof universe !== 'object' || !universe.name || !Array.isArray(universe.skinSets)) {
+                return;
+            }
+            universe.skinSets.forEach(skinSet => {
+                const id = parseInt(typeof skinSet === 'object' ? skinSet.id : skinSet, 10);
+                if (!isNaN(id)) {
+                    skinLineToUniverse[id] = universe.name;
+                }
+            });
+        });
+
+        skinData.forEach(skin => {
+            if (!skin.tilePath) return;
+            const skinLineId = skin.skinLines && skin.skinLines.length > 0 && skin.skinLines[0].id != null ? parseInt(skin.skinLines[0].id, 10) : null;
+
+            let groupName = 'Other';
+            let skinLineName = null;
+
+            if (skinLineId) {
+                skinLineName = skinLineToName[skinLineId] || `Unknown SkinLine ${skinLineId}`;
+                groupName = skinLineToUniverse[skinLineId] || skinLineName;
+            }
+
+            if (!groupedByUniverse[groupName]) {
+                groupedByUniverse[groupName] = [];
+            }
+            groupedByUniverse[groupName].push({
+                name: skin.name,
+                tilePath: skin.tilePath,
+                splashPath: skin.splashPath,
+                uncenteredSplashPath: skin.uncenteredSplashPath,
+                skinLineId,
+                skinLineName
+            });
+        });
+
+        const universeGroups = Object.keys(groupedByUniverse).map(universe => ({
+            title: universe,
+            items: groupedByUniverse[universe]
+        }));
+
+        universeGroups.sort((a, b) => a.title.localeCompare(b.title));
+        universeGroups.forEach(group => {
+            group.items.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        previewGroups.push(...universeGroups);
+    } else if (type === 'skinlines') {
+        if (!Array.isArray(skinLineData) || skinLineData.length === 0) {
+            console.warn('Skinline data unavailable, falling back to champion');
+            generatePreviewGroups('champion');
+            return;
+        }
+
+        const groupedBySkinLine = { Other: [] };
+        const skinLineToName = {};
+
+        skinLineData.forEach(skinLine => {
+            if (skinLine.id && skinLine.name) {
+                skinLineToName[skinLine.id] = skinLine.name;
+            }
+        });
+
+        skinData.forEach(skin => {
+            if (!skin.tilePath) return;
+            const skinLineId = skin.skinLines && skin.skinLines.length > 0 && skin.skinLines[0].id != null ? parseInt(skin.skinLines[0].id, 10) : null;
+
+            let groupName = 'Other';
+            let skinLineName = null;
+
+            if (skinLineId) {
+                skinLineName = skinLineToName[skinLineId] || `Unknown SkinLine ${skinLineId}`;
+                groupName = skinLineName;
+            }
+
+            if (!groupedBySkinLine[groupName]) {
+                groupedBySkinLine[groupName] = [];
+            }
+            groupedBySkinLine[groupName].push({
+                name: skin.name,
+                tilePath: skin.tilePath,
+                splashPath: skin.splashPath,
+                uncenteredSplashPath: skin.uncenteredSplashPath,
+                skinLineId,
+                skinLineName
+            });
+        });
+
+        const skinLineGroups = Object.keys(groupedBySkinLine).map(skinLine => ({
+            title: skinLine,
+            items: groupedBySkinLine[skinLine]
+        }));
+
+        skinLineGroups.sort((a, b) => a.title.localeCompare(b.title));
+        skinLineGroups.forEach(group => {
+            group.items.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        previewGroups.push(...skinLineGroups);
+    } else {
+        console.warn('Invalid type, falling back to champion');
+        generatePreviewGroups('champion');
+    }
+
+    if (DataStore.get('tftEnabled') !== false && tftData.length > 0) {
+        const tftGroup = {
+            title: 'TFT',
+            items: tftData
+                .filter(item => 
+                    item.descriptionTraKey && 
+                    item.descriptionTraKey.toLowerCase().startsWith('companion') && 
+                    item.backgroundTextureLCU
+                )
+                .map(item => ({
+                    name: item.name,
+                    tilePath: item.standaloneLoadoutsLargeIcon,
+                    splashPath: item.backgroundTextureLCU,
+                    uncenteredSplashPath: item.backgroundTextureLCU,
+                    skinLineId: null,
+                    skinLineName: null,
+                    isTFT: true
+                }))
+        };
+        if (tftGroup.items.length > 0) {
+            tftGroup.items.sort((a, b) => a.name.localeCompare(b.name));
+            previewGroups.push(tftGroup);
+        }
+    }
+
+    console.log(`Generated ${previewGroups.length} preview groups for type: ${type}`);
+}
+
+function createProfilesUI(container) {
+    const profilesWrapper = document.createElement('div');
+    profilesWrapper.id = 'client-bg-profiles-ui-wrapper';
+    profilesWrapper.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
@@ -69,7 +681,12 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         align-items: center;
         z-index: 10000;
         background: rgba(0, 0, 0, 0.7);
-    `;let o=document.createElement("div");o.id="client-bg-profiles-ui",o.className="lol-custom-ui",o.style.cssText=`
+    `;
+
+    const profilesContainer = document.createElement('div');
+    profilesContainer.id = 'client-bg-profiles-ui';
+    profilesContainer.className = 'lol-custom-ui';
+    profilesContainer.style.cssText = `
         width: 600px;
         height: 550px;
         display: flex;
@@ -81,20 +698,31 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
         box-sizing: border-box;
         padding: 20px 0;
-    `;let a=document.createElement("div");a.style.cssText=`
+    `;
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = `
         flex: 1;
         display: flex;
         flex-direction: column;
         overflow: hidden;
         margin: 0 20px;
-    `;let n=document.createElement("h3");n.textContent="Manage Skin Profiles",n.style.cssText=`
+    `;
+
+    const title = document.createElement('h3');
+    title.textContent = 'Manage Skin Profiles';
+    title.style.cssText = `
         color: #f0e6d2;
         font-size: 24px;
         font-weight: bold;
         text-align: center;
         margin: 0 0 20px 0;
         text-transform: uppercase;
-    `,a.appendChild(n);let l=document.createElement("div");l.style.cssText=`
+    `;
+    innerContainer.appendChild(title);
+
+    const profilesContent = document.createElement('div');
+    profilesContent.style.cssText = `
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -103,7 +731,15 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         padding-right: 10px;
         scrollbar-width: thin;
         scrollbar-color: #785a28 transparent;
-    `,l.className="profiles-content";let r=document.createElement("div");r.style.cssText="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;";let i=document.createElement("input");i.type="text",i.placeholder=`Profile ${skinProfiles.length+1}`,i.style.cssText=`
+    `;
+    profilesContent.className = 'profiles-content';
+
+    const createProfileSection = document.createElement('div');
+    createProfileSection.style.cssText = `display: flex; align-items: center; gap: 10px; margin-bottom: 15px;`;
+    const profileNameInput = document.createElement('input');
+    profileNameInput.type = 'text';
+    profileNameInput.placeholder = `Profile ${skinProfiles.length + 1}`;
+    profileNameInput.style.cssText = `
         flex: 1;
         background: #010a13;
         border: 1px solid #785a28;
@@ -111,7 +747,10 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         padding: 8px;
         border-radius: 2px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
-    `;let s=document.createElement("button");s.textContent="+",s.style.cssText=`
+    `;
+    const addProfileButton = document.createElement('button');
+    addProfileButton.textContent = '+';
+    addProfileButton.style.cssText = `
         padding: 8px 12px;
         background: #1e2328;
         border: 1px solid #785a28;
@@ -119,67 +758,261 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border-radius: 2px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
         cursor: pointer;
-    `,s.addEventListener("mouseover",()=>{s.style.background="#1e2328",s.style.borderColor="#c8aa6e",s.style.color="#f0e6d2"}),s.addEventListener("mouseout",()=>{s.style.background="#1e2328",s.style.borderColor="#785a28",s.style.color="#cdbe91"});let d=document.createElement("span");d.style.cssText="color: #ff5555; font-size: 12px; display: none; margin-top: 5px;",r.appendChild(i),r.appendChild(s),l.appendChild(r),l.appendChild(d);let c=document.createElement("div");function p(){if(c.innerHTML="",0===skinProfiles.length){let e=document.createElement("div");e.textContent="No profiles saved",e.style.cssText=`
+    `;
+    addProfileButton.addEventListener('mouseover', () => {
+        addProfileButton.style.background = '#1e2328';
+        addProfileButton.style.borderColor = '#c8aa6e';
+        addProfileButton.style.color = '#f0e6d2';
+    });
+    addProfileButton.addEventListener('mouseout', () => {
+        addProfileButton.style.background = '#1e2328';
+        addProfileButton.style.borderColor = '#785a28';
+        addProfileButton.style.color = '#cdbe91';
+    });
+    const errorMessage = document.createElement('span');
+    errorMessage.style.cssText = `color: #ff5555; font-size: 12px; display: none; margin-top: 5px;`;
+    createProfileSection.appendChild(profileNameInput);
+    createProfileSection.appendChild(addProfileButton);
+    profilesContent.appendChild(createProfileSection);
+    profilesContent.appendChild(errorMessage);
+
+    const profilesList = document.createElement('div');
+    profilesList.style.cssText = `display: flex; flex-direction: column; gap: 10px;`;
+    profilesContent.appendChild(profilesList);
+
+    function renderProfilesList() {
+        profilesList.innerHTML = '';
+        if (skinProfiles.length === 0) {
+            const noProfilesMessage = document.createElement('div');
+            noProfilesMessage.textContent = 'No profiles saved';
+            noProfilesMessage.style.cssText = `
                 color: #f0e6d2;
                 font-size: 16px;
                 text-align: center;
                 padding: 20px;
-            `,c.appendChild(e);return}skinProfiles.forEach((e,t)=>{let o=document.createElement("div");o.style.cssText=`
+            `;
+            profilesList.appendChild(noProfilesMessage);
+            return;
+        }
+        skinProfiles.forEach((profile, index) => {
+            const profileRow = document.createElement('div');
+            profileRow.style.cssText = `
                 display: flex;
                 align-items: center;
                 gap: 10px;
                 padding: 5px;
                 border-bottom: 1px solid #785a28;
-                ${e.name===activeProfile?"background: #1e2328; border: 1px solid #c8aa6e; border-radius: 4px;":""}
-            `;let a=document.createElement("span");a.textContent=e.name,a.style.cssText=`
+                ${profile.name === activeProfile ? 'background: #1e2328; border: 1px solid #c8aa6e; border-radius: 4px;' : ''}
+            `;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = profile.name;
+            nameSpan.style.cssText = `
                 flex: 1;
-                color: ${e.name===activeProfile?"#f0e6d2":"#cdbe91"};
+                color: ${profile.name === activeProfile ? '#f0e6d2' : '#cdbe91'};
                 cursor: pointer;
-            `,a.addEventListener("click",()=>{let t=document.createElement("input");t.type="text",t.value=e.name,t.style.cssText=`
+            `;
+            nameSpan.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = profile.name;
+                input.style.cssText = `
                     width: 100%;
                     background: #010a13;
                     border: 1px solid #785a28;
                     color: #cdbe91;
                     padding: 4px;
                     border-radius: 2px;
-                `,t.addEventListener("blur",()=>{let o=t.value.trim();o&&!skinProfiles.some(t=>t.name===o&&t!==e)?(e.name===activeProfile&&(activeProfile=o),e.name=o,saveSettings(),p()):(d.textContent=o?"Name already taken":"Name cannot be empty",d.style.display="block",setTimeout(()=>{d.style.display="none"},3e3),p())}),t.addEventListener("keypress",e=>{"Enter"===e.key&&t.blur()}),a.replaceWith(t),t.focus()});let n=document.createElement("button");n.textContent="Load",n.style.cssText=`
+                `;
+                input.addEventListener('blur', () => {
+                    const newName = input.value.trim();
+                    if (newName && !skinProfiles.some(p => p.name === newName && p !== profile)) {
+                        if (profile.name === activeProfile) {
+                            activeProfile = newName;
+                        }
+                        profile.name = newName;
+                        saveSettings();
+                        renderProfilesList();
+                    } else {
+                        errorMessage.textContent = newName ? 'Name already taken' : 'Name cannot be empty';
+                        errorMessage.style.display = 'block';
+                        setTimeout(() => { errorMessage.style.display = 'none'; }, 3000);
+                        renderProfilesList();
+                    }
+                });
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') input.blur();
+                });
+                nameSpan.replaceWith(input);
+                input.focus();
+            });
+            const loadButton = document.createElement('button');
+            loadButton.textContent = 'Load';
+            loadButton.style.cssText = `
                 padding: 4px 8px;
                 background: #1e2328;
                 border: 1px solid #785a28;
                 color: #cdbe91;
                 border-radius: 2px;
                 cursor: pointer;
-            `,n.addEventListener("click",()=>{console.log(`Loading profile: ${e.name}`),DataStore.set("favoriteSkins",e.skins),window.favoriteSkins=e.skins||[],window.isFavoritesToggled=DataStore.get("favoritesToggled")||!1,activeProfile=e.name,saveSettings(),p();let t=document.getElementById("client-bg-customizer-ui");if(t){let o=t.querySelector(".main-window");if(o&&window.renderSkins){console.log("Preparing to render skins with:",{favoriteSkinsCount:window.favoriteSkins.length,isFavoritesToggled:window.isFavoritesToggled,previewGroupsCount:previewGroups.length,searchQuery:currentSearchQuery});let a=t.querySelector(".filter-dropdown .dropdown-toggle"),n=t.querySelector(".filter-dropdown .dropdown-menu");if(a&&n){let l=window.isFavoritesToggled?"Favorites":"All Skins";a.textContent=l,n.querySelectorAll(".dropdown-item").forEach(e=>{e.classList.toggle("selected",e.textContent===l)}),console.log(`Filter dropdown updated to: ${l}`)}else console.warn("Filter dropdown or menu not found");let r=window.isFavoritesToggled?"favorites":"all";console.log(`Rendering skins with filter: ${r}`),window.renderSkins(previewGroups,currentSearchQuery,r)}else console.error("Main window or renderSkins missing")}else console.error("Customizer UI not found")});let l=document.createElement("button");l.textContent="Save",l.style.cssText=`
+            `;
+            loadButton.addEventListener('click', () => {
+                console.log(`Loading profile: ${profile.name}`);
+                DataStore.set('favoriteSkins', profile.skins);
+                window.favoriteSkins = profile.skins || []; // Sync global state
+                window.isFavoritesToggled = DataStore.get('favoritesToggled') || false; // Load persisted filter state
+                activeProfile = profile.name;
+                saveSettings();
+                renderProfilesList();
+                const customizerUI = document.getElementById('client-bg-customizer-ui');
+                if (customizerUI) {
+                    const mainWindow = customizerUI.querySelector('.main-window');
+                    if (mainWindow && window.renderSkins) {
+                        console.log('Preparing to render skins with:', {
+                            favoriteSkinsCount: window.favoriteSkins.length,
+                            isFavoritesToggled: window.isFavoritesToggled,
+                            previewGroupsCount: previewGroups.length,
+                            searchQuery: currentSearchQuery
+                        });
+                        // Update filter dropdown UI to reflect persisted state
+                        const filterDropdown = customizerUI.querySelector('.filter-dropdown .dropdown-toggle');
+                        const filterMenu = customizerUI.querySelector('.filter-dropdown .dropdown-menu');
+                        if (filterDropdown && filterMenu) {
+                            const currentFilter = window.isFavoritesToggled ? 'Favorites' : 'All Skins';
+                            filterDropdown.textContent = currentFilter;
+                            filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
+                                item.classList.toggle('selected', item.textContent === currentFilter);
+                            });
+                            console.log(`Filter dropdown updated to: ${currentFilter}`);
+                        } else {
+                            console.warn('Filter dropdown or menu not found');
+                        }
+                        // Directly call renderSkins with the correct filter
+                        const filterValue = window.isFavoritesToggled ? 'favorites' : 'all';
+                        console.log(`Rendering skins with filter: ${filterValue}`);
+                        window.renderSkins(previewGroups, currentSearchQuery, filterValue);
+                    } else {
+                        console.error('Main window or renderSkins missing');
+                    }
+                } else {
+                    console.error('Customizer UI not found');
+                }
+            });
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save';
+            saveButton.style.cssText = `
                 padding: 4px 8px;
                 background: #1e2328;
                 border: 1px solid #785a28;
                 color: #cdbe91;
                 border-radius: 2px;
                 cursor: pointer;
-            `,l.addEventListener("click",()=>{let t=DataStore.get("favoriteSkins")||[];if(0===t.length){d.textContent="No favorites to save",d.style.display="block",setTimeout(()=>{d.style.display="none"},3e3);return}e.skins=t,saveSettings(),p()});let r=document.createElement("button");r.textContent="\uD83D\uDDD1",r.style.cssText=`
+            `;
+            saveButton.addEventListener('click', () => {
+                const currentFavorites = DataStore.get('favoriteSkins') || [];
+                if (currentFavorites.length === 0) {
+                    errorMessage.textContent = 'No favorites to save';
+                    errorMessage.style.display = 'block';
+                    setTimeout(() => { errorMessage.style.display = 'none'; }, 3000);
+                    return;
+                }
+                profile.skins = currentFavorites;
+                saveSettings();
+                renderProfilesList();
+            });
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = '🗑';
+            deleteButton.style.cssText = `
                 padding: 4px 8px;
                 background: #1e2328;
                 border: 1px solid #785a28;
                 color: #cdbe91;
                 border-radius: 2px;
                 cursor: pointer;
-            `,r.addEventListener("click",()=>{skinProfiles=skinProfiles.filter(t=>t!==e),activeProfile===e.name&&(activeProfile=null),saveSettings(),p()});let i=document.createElement("button");i.textContent="↑",i.style.cssText=`
+            `;
+            deleteButton.addEventListener('click', () => {
+                skinProfiles = skinProfiles.filter(p => p !== profile);
+                if (activeProfile === profile.name) activeProfile = null;
+                saveSettings();
+                renderProfilesList();
+            });
+            const upButton = document.createElement('button');
+            upButton.textContent = '↑';
+            upButton.style.cssText = `
                 padding: 4px 8px;
                 background: #1e2328;
                 border: 1px solid #785a28;
                 color: #cdbe91;
                 border-radius: 2px;
-                cursor: ${0===t?"not-allowed":"pointer"};
-                opacity: ${0===t?.5:1};
-            `,i.disabled=0===t,i.addEventListener("click",()=>{t>0&&([skinProfiles[t-1],skinProfiles[t]]=[skinProfiles[t],skinProfiles[t-1]],saveSettings(),p())});let s=document.createElement("button");s.textContent="↓",s.style.cssText=`
+                cursor: ${index === 0 ? 'not-allowed' : 'pointer'};
+                opacity: ${index === 0 ? 0.5 : 1};
+            `;
+            upButton.disabled = index === 0;
+            upButton.addEventListener('click', () => {
+                if (index > 0) {
+                    [skinProfiles[index - 1], skinProfiles[index]] = [skinProfiles[index], skinProfiles[index - 1]];
+                    saveSettings();
+                    renderProfilesList();
+                }
+            });
+            const downButton = document.createElement('button');
+            downButton.textContent = '↓';
+            downButton.style.cssText = `
                 padding: 4px 8px;
                 background: #1e2328;
                 border: 1px solid #785a28;
                 color: #cdbe91;
                 border-radius: 2px;
-                cursor: ${t===skinProfiles.length-1?"not-allowed":"pointer"};
-                opacity: ${t===skinProfiles.length-1?.5:1};
-            `,s.disabled=t===skinProfiles.length-1,s.addEventListener("click",()=>{t<skinProfiles.length-1&&([skinProfiles[t],skinProfiles[t+1]]=[skinProfiles[t+1],skinProfiles[t]],saveSettings(),p())}),[n,l,r,i,s].forEach(e=>{e.addEventListener("mouseover",()=>{e.style.background="#1e2328",e.style.borderColor="#c8aa6e",e.style.color="#f0e6d2"}),e.addEventListener("mouseout",()=>{e.style.background="#1e2328",e.style.borderColor="#785a28",e.style.color="#cdbe91"})}),o.appendChild(a),o.appendChild(n),o.appendChild(l),o.appendChild(r),o.appendChild(i),o.appendChild(s),c.appendChild(o)})}c.style.cssText="display: flex; flex-direction: column; gap: 10px;",l.appendChild(c),s.addEventListener("click",()=>{let e=i.value.trim()||`Profile ${skinProfiles.length+1}`;if(!e||skinProfiles.some(t=>t.name===e)){d.textContent=e?"Name already taken":"Name cannot be empty",d.style.display="block",setTimeout(()=>{d.style.display="none"},3e3);return}skinProfiles.push({name:e,skins:[]}),saveSettings(),i.value="",p()}),p();let u=document.createElement("style");u.textContent=`
+                cursor: ${index === skinProfiles.length - 1 ? 'not-allowed' : 'pointer'};
+                opacity: ${index === skinProfiles.length - 1 ? 0.5 : 1};
+            `;
+            downButton.disabled = index === skinProfiles.length - 1;
+            downButton.addEventListener('click', () => {
+                if (index < skinProfiles.length - 1) {
+                    [skinProfiles[index], skinProfiles[index + 1]] = [skinProfiles[index + 1], skinProfiles[index]];
+                    saveSettings();
+                    renderProfilesList();
+                }
+            });
+            [loadButton, saveButton, deleteButton, upButton, downButton].forEach(btn => {
+                btn.addEventListener('mouseover', () => {
+                    btn.style.background = '#1e2328';
+                    btn.style.borderColor = '#c8aa6e';
+                    btn.style.color = '#f0e6d2';
+                });
+                btn.addEventListener('mouseout', () => {
+                    btn.style.background = '#1e2328';
+                    btn.style.borderColor = '#785a28';
+                    btn.style.color = '#cdbe91';
+                });
+            });
+            profileRow.appendChild(nameSpan);
+            profileRow.appendChild(loadButton);
+            profileRow.appendChild(saveButton);
+            profileRow.appendChild(deleteButton);
+            profileRow.appendChild(upButton);
+            profileRow.appendChild(downButton);
+            profilesList.appendChild(profileRow);
+        });
+    }
+
+    addProfileButton.addEventListener('click', () => {
+        const name = profileNameInput.value.trim() || `Profile ${skinProfiles.length + 1}`;
+        if (!name || skinProfiles.some(p => p.name === name)) {
+            errorMessage.textContent = name ? 'Name already taken' : 'Name cannot be empty';
+            errorMessage.style.display = 'block';
+            setTimeout(() => { errorMessage.style.display = 'none'; }, 3000);
+            return;
+        }
+        skinProfiles.push({ name, skins: [] });
+        saveSettings();
+        profileNameInput.value = '';
+        renderProfilesList();
+    });
+
+    renderProfilesList();
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
         .profiles-content::-webkit-scrollbar {
             width: 6px;
         }
@@ -193,7 +1026,16 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         .profiles-content::-webkit-scrollbar-thumb:hover {
             background: #c8aa6e;
         }
-    `,document.head.appendChild(u),a.appendChild(l),o.appendChild(a);let g=document.createElement("button");g.textContent="Close",g.className="profiles-close-button",g.style.cssText=`
+    `;
+    document.head.appendChild(styleSheet);
+
+    innerContainer.appendChild(profilesContent);
+    profilesContainer.appendChild(innerContainer);
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.className = 'profiles-close-button';
+    closeButton.style.cssText = `
         margin-top: 20px;
         margin-left: auto;
         margin-right: auto;
@@ -211,7 +1053,154 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 2px solid #785a28;
         box-shadow: 0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13;
         transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
-    `,g.addEventListener("mouseover",()=>{g.style.color="#f0e6d2",g.style.borderColor="#c8aa6e",g.style.boxShadow="0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13"}),g.addEventListener("mouseout",()=>{g.style.color="#cdbe91",g.style.borderColor="#785a28",g.style.boxShadow="none"}),g.addEventListener("click",()=>{console.log("Profiles UI closing, starting restore process"),t.remove();let o=document.getElementById("client-bg-customizer-ui-wrapper"),a=document.querySelectorAll("#client-bg-customizer-ui-wrapper");a.length>1&&(console.warn("Multiple customizer wrappers found, removing duplicates"),a.forEach((e,t)=>{t>0&&e.remove()}),o=a[0]);let n=document.querySelectorAll(".client-bg-customizer-backdrop");if(n.length>1&&(console.warn("Multiple backdrops found, removing duplicates"),n.forEach((e,t)=>{t>0&&e.remove()})),o){console.log("Customizer wrapper found, restoring visibility"),o.style.display="block";let l=document.getElementById("client-bg-customizer-ui"),r=l?.querySelector(".main-window");if(l&&r&&window.renderSkins){window.favoriteSkins=DataStore.get("favoriteSkins")||[],window.isFavoritesToggled=DataStore.get("favoritesToggled")||!1,console.log("Restored state:",{favoriteSkinsCount:window.favoriteSkins.length,isFavoritesToggled:window.isFavoritesToggled,previewGroupsCount:previewGroups.length,searchQuery:currentSearchQuery});let i=o.querySelector(".favorites-toggle");if(i){i.classList.toggle("toggled",window.isFavoritesToggled);let s=i.querySelector(".toggled");s&&s.classList.toggle("toggled-on",window.isFavoritesToggled),console.log("Favorites toggle updated")}let d=l.querySelector(".filter-dropdown .dropdown-toggle"),c=l.querySelector(".filter-dropdown .dropdown-menu");if(d&&c){let p=window.isFavoritesToggled?"Favorites":"All Skins";d.textContent=p,c.querySelectorAll(".dropdown-item").forEach(e=>{e.classList.toggle("selected",e.textContent===p)}),console.log(`Filter dropdown updated to: ${p}`)}previewGroups.length||(console.warn("previewGroups empty, regenerating"),generatePreviewGroups("champion")),document.querySelectorAll(".favorite-button").forEach(e=>{let t=e.closest(".skin-image")?.dataset.name,o="true"===e.closest(".skin-image")?.dataset.isTFT;t&&e.classList.toggle("favorited",window.favoriteSkins.some(e=>e.name===t&&e.isTFT===o))}),document.querySelectorAll(".group-favorite-button").forEach(e=>{let t=e.closest(".skin-group-title")?.dataset.groupTitle,o=previewGroups.find(e=>e.title===t)?.items||[],a=o.every(e=>window.favoriteSkins.some(t=>t.name===e.name&&t.isTFT===e.isTFT));e.classList.toggle("favorited",a)});let u=window.isFavoritesToggled?"favorites":"all";console.log(`Rendering skins with filter: ${u}`),window.renderSkins(previewGroups,currentSearchQuery,u);let g=DataStore.get("selectedSkin");if(g&&g.name){let m=CSS.escape(g.name),h=`.skin-image[data-name="${m}"][data-is-tft="${g.isTFT}"]`,b=r.querySelector(h);b?(b.classList.add("selected"),b.scrollIntoView({behavior:"smooth",block:"center"}),console.log(`Highlighted selected skin: ${g.name}`)):console.warn(`Selected skin not found: ${g.name}`)}}else{console.warn("Customizer UI or main window missing, reinitializing"),o&&o.remove();let f=document.querySelector(".client-bg-customizer-backdrop");f&&f.remove(),createClientBackgroundCustomizerUI(e)}}else{console.warn("Customizer wrapper not found, creating new UI");let $=document.querySelector(".client-bg-customizer-backdrop");$&&$.remove(),createClientBackgroundCustomizerUI(e)}}),o.appendChild(g),t.appendChild(o),e.appendChild(t);let m=document.getElementById("client-bg-customizer-ui-wrapper");m?(console.log("Hiding customizer UI"),m.style.display="none"):console.warn("Customizer wrapper not found during profiles UI init")}function createSettingsUI(e){let t=document.createElement("div");t.id="client-bg-settings-ui-wrapper",t.style.cssText=`
+    `;
+    closeButton.addEventListener('mouseover', () => {
+        closeButton.style.color = '#f0e6d2';
+        closeButton.style.borderColor = '#c8aa6e';
+        closeButton.style.boxShadow = '0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13';
+    });
+    closeButton.addEventListener('mouseout', () => {
+        closeButton.style.color = '#cdbe91';
+        closeButton.style.borderColor = '#785a28';
+        closeButton.style.boxShadow = 'none';
+    });
+    closeButton.addEventListener('click', () => {
+        console.log('Profiles UI closing, starting restore process');
+        profilesWrapper.remove();
+
+        // Find existing wrapper or clean up duplicates
+        let customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+        const existingWrappers = document.querySelectorAll('#client-bg-customizer-ui-wrapper');
+        if (existingWrappers.length > 1) {
+            console.warn('Multiple customizer wrappers found, removing duplicates');
+            existingWrappers.forEach((wrapper, index) => {
+                if (index > 0) wrapper.remove();
+            });
+            customizerWrapper = existingWrappers[0];
+        }
+
+        // Clean up duplicate backdrops
+        const existingBackdrops = document.querySelectorAll('.client-bg-customizer-backdrop');
+        if (existingBackdrops.length > 1) {
+            console.warn('Multiple backdrops found, removing duplicates');
+            existingBackdrops.forEach((backdrop, index) => {
+                if (index > 0) backdrop.remove();
+            });
+        }
+
+        if (customizerWrapper) {
+            console.log('Customizer wrapper found, restoring visibility');
+            customizerWrapper.style.display = 'block';
+            const customizerUI = document.getElementById('client-bg-customizer-ui');
+            const mainWindow = customizerUI?.querySelector('.main-window');
+            if (customizerUI && mainWindow && window.renderSkins) {
+                // Reload state from DataStore
+                window.favoriteSkins = DataStore.get('favoriteSkins') || [];
+                window.isFavoritesToggled = DataStore.get('favoritesToggled') || false;
+                console.log('Restored state:', {
+                    favoriteSkinsCount: window.favoriteSkins.length,
+                    isFavoritesToggled: window.isFavoritesToggled,
+                    previewGroupsCount: previewGroups.length,
+                    searchQuery: currentSearchQuery
+                });
+
+                // Update favorites toggle UI
+                const favoritesToggleBtn = customizerWrapper.querySelector('.favorites-toggle');
+                if (favoritesToggleBtn) {
+                    favoritesToggleBtn.classList.toggle('toggled', window.isFavoritesToggled);
+                    const toggledDiv = favoritesToggleBtn.querySelector('.toggled');
+                    if (toggledDiv) {
+                        toggledDiv.classList.toggle('toggled-on', window.isFavoritesToggled);
+                    }
+                    console.log('Favorites toggle updated');
+                }
+
+                // Update filter dropdown UI
+                const filterDropdown = customizerUI.querySelector('.filter-dropdown .dropdown-toggle');
+                const filterMenu = customizerUI.querySelector('.filter-dropdown .dropdown-menu');
+                if (filterDropdown && filterMenu) {
+                    const currentFilter = window.isFavoritesToggled ? 'Favorites' : 'All Skins';
+                    filterDropdown.textContent = currentFilter;
+                    filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
+                        item.classList.toggle('selected', item.textContent === currentFilter);
+                    });
+                    console.log(`Filter dropdown updated to: ${currentFilter}`);
+                }
+
+                // Ensure previewGroups is populated
+                if (!previewGroups.length) {
+                    console.warn('previewGroups empty, regenerating');
+                    generatePreviewGroups('champion');
+                }
+
+                // Update favorite buttons
+                document.querySelectorAll('.favorite-button').forEach(btn => {
+                    const skinName = btn.closest('.skin-image')?.dataset.name;
+                    const isTFT = btn.closest('.skin-image')?.dataset.isTFT === 'true';
+                    if (skinName) {
+                        btn.classList.toggle('favorited', window.favoriteSkins.some(fav => fav.name === skinName && fav.isTFT === isTFT));
+                    }
+                });
+                document.querySelectorAll('.group-favorite-button').forEach(btn => {
+                    const groupTitle = btn.closest('.skin-group-title')?.dataset.groupTitle;
+                    const groupItems = previewGroups.find(group => group.title === groupTitle)?.items || [];
+                    const allFavorited = groupItems.every(item => window.favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT));
+                    btn.classList.toggle('favorited', allFavorited);
+                });
+
+                // Render with correct filter
+                const filterValue = window.isFavoritesToggled ? 'favorites' : 'all';
+                console.log(`Rendering skins with filter: ${filterValue}`);
+                window.renderSkins(previewGroups, currentSearchQuery, filterValue);
+
+                // Highlight selected skin
+                const savedSkin = DataStore.get('selectedSkin');
+                if (savedSkin && savedSkin.name) {
+                    const escapedName = CSS.escape(savedSkin.name);
+                    const selector = `.skin-image[data-name="${escapedName}"][data-is-tft="${savedSkin.isTFT}"]`;
+                    const selectedImage = mainWindow.querySelector(selector);
+                    if (selectedImage) {
+                        selectedImage.classList.add('selected');
+                        selectedImage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        console.log(`Highlighted selected skin: ${savedSkin.name}`);
+                    } else {
+                        console.warn(`Selected skin not found: ${savedSkin.name}`);
+                    }
+                }
+            } else {
+                console.warn('Customizer UI or main window missing, reinitializing');
+                // Remove existing wrapper and backdrop to avoid duplicates
+                if (customizerWrapper) customizerWrapper.remove();
+                const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
+                if (existingBackdrop) existingBackdrop.remove();
+                createClientBackgroundCustomizerUI(container);
+            }
+        } else {
+            console.warn('Customizer wrapper not found, creating new UI');
+            // Ensure no duplicate backdrops remain
+            const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
+            if (existingBackdrop) existingBackdrop.remove();
+            createClientBackgroundCustomizerUI(container);
+        }
+    });
+    profilesContainer.appendChild(closeButton);
+
+    profilesWrapper.appendChild(profilesContainer);
+    container.appendChild(profilesWrapper);
+
+    const customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+    if (customizerWrapper) {
+        console.log('Hiding customizer UI');
+        customizerWrapper.style.display = 'none';
+    } else {
+        console.warn('Customizer wrapper not found during profiles UI init');
+    }
+}
+
+function createSettingsUI(container) {
+    const settingsWrapper = document.createElement('div');
+    settingsWrapper.id = 'client-bg-settings-ui-wrapper';
+    settingsWrapper.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
@@ -222,7 +1211,12 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         align-items: center;
         z-index: 10000;
         background: rgba(0, 0, 0, 0.7);
-    `;let o=document.createElement("div");o.id="client-bg-settings-ui",o.className="lol-custom-ui",o.style.cssText=`
+    `;
+
+    const settingsContainer = document.createElement('div');
+    settingsContainer.id = 'client-bg-settings-ui';
+    settingsContainer.className = 'lol-custom-ui';
+    settingsContainer.style.cssText = `
         width: 600px;
         height: 550px;
         display: flex;
@@ -234,7 +1228,10 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
         box-sizing: border-box;
         padding: 20px 0;
-    `;let a=document.createElement("div");a.style.cssText=`
+    `;
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = `
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -243,14 +1240,22 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         margin-right: 0px;
         margin-bottom: 0px;
         margin-left: 20px;
-    `;let n=document.createElement("h3");n.textContent="Background Settings",n.style.cssText=`
+    `;
+
+    const title = document.createElement('h3');
+    title.textContent = 'Background Settings';
+    title.style.cssText = `
         color: #f0e6d2;
         font-size: 24px;
         font-weight: bold;
         text-align: center;
         margin: 0 0 20px 0;
         text-transform: uppercase;
-    `,a.appendChild(n);let l=document.createElement("div");l.style.cssText=`
+    `;
+    innerContainer.appendChild(title);
+
+    const settingsContent = document.createElement('div');
+    settingsContent.style.cssText = `
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -260,7 +1265,10 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         padding-right: 10px;
         scrollbar-width: thin;
         scrollbar-color: #785a28 transparent;
-    `,l.className="settings-content";let r=document.createElement("style");r.textContent=`
+    `;
+    settingsContent.className = 'settings-content';
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
         .settings-content::-webkit-scrollbar {
             width: 6px;
         }
@@ -274,18 +1282,63 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         .settings-content::-webkit-scrollbar-thumb:hover {
             background: #c8aa6e;
         }
-    `,document.head.appendChild(r);let i=document.createElement("h4");i.textContent="General",i.style.cssText=`
+    `;
+    document.head.appendChild(styleSheet);
+
+    const generalTitle = document.createElement('h4');
+    generalTitle.textContent = 'General';
+    generalTitle.style.cssText = `
         color: #f0e6d2;
         font-size: 18px;
         font-weight: bold;
         margin: 10px 0 5px 0;
         text-transform: uppercase;
-    `,l.appendChild(i);let s=document.createElement("div");s.className="toggle-btn",s.style.cssText="margin-bottom: 15px;";let d=document.createElement("span");d.textContent="Enable Background:";let c=document.createElement("label");c.className="toggle-switch";let p=document.createElement("input");p.type="checkbox",p.checked=backgroundEnabled;let u=document.createElement("span");u.className="toggle-slider",c.appendChild(p),c.appendChild(u),s.appendChild(d),s.appendChild(c),l.appendChild(s),p.addEventListener("change",()=>{backgroundEnabled=p.checked,saveSettings(),checkAndApplyBackground()});let g=document.createElement("label");g.textContent="Background Opacity:",g.style.cssText="margin-bottom: 5px;",l.appendChild(g);let m=document.createElement("div");m.style.cssText=`
+    `;
+    settingsContent.appendChild(generalTitle);
+
+    const enableContainer = document.createElement('div');
+    enableContainer.className = 'toggle-btn';
+    enableContainer.style.cssText = `margin-bottom: 15px;`;
+    const enableLabel = document.createElement('span');
+    enableLabel.textContent = 'Enable Background:';
+    const enableSwitch = document.createElement('label');
+    enableSwitch.className = 'toggle-switch';
+    const enableInput = document.createElement('input');
+    enableInput.type = 'checkbox';
+    enableInput.checked = backgroundEnabled;
+    const enableSlider = document.createElement('span');
+    enableSlider.className = 'toggle-slider';
+    enableSwitch.appendChild(enableInput);
+    enableSwitch.appendChild(enableSlider);
+    enableContainer.appendChild(enableLabel);
+    enableContainer.appendChild(enableSwitch);
+    settingsContent.appendChild(enableContainer);
+
+    enableInput.addEventListener('change', () => {
+        backgroundEnabled = enableInput.checked;
+        saveSettings();
+        checkAndApplyBackground();
+    });
+
+    const opacityLabel = document.createElement('label');
+    opacityLabel.textContent = 'Background Opacity:';
+    opacityLabel.style.cssText = `margin-bottom: 5px;`;
+    settingsContent.appendChild(opacityLabel);
+
+    const opacityContainer = document.createElement('div');
+    opacityContainer.style.cssText = `
         display: flex;
         align-items: center;
         gap: 15px;
         margin-bottom: 15px;
-    `;let h=document.createElement("input");h.type="range",h.min="0.1",h.max="1",h.step="0.1",h.value=currentOpacity,h.style.cssText=`
+    `;
+    const opacitySlider = document.createElement('input');
+    opacitySlider.type = 'range';
+    opacitySlider.min = '0.1';
+    opacitySlider.max = '1';
+    opacitySlider.step = '0.1';
+    opacitySlider.value = storedOpacity; // Use storedOpacity
+    opacitySlider.style.cssText = `
         flex: 1;
         height: 8px;
         -webkit-appearance: none;
@@ -293,7 +1346,13 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 4px;
         outline: none;
-    `;let b=document.createElement("span");b.textContent=currentOpacity.toString(),b.style.width="40px";let f=document.createElement("button");f.textContent="<",f.style.cssText=`
+    `;
+    const opacityValue = document.createElement('span');
+    opacityValue.textContent = storedOpacity.toString();
+    opacityValue.style.width = '40px';
+    const opacityLeftArrow = document.createElement('button');
+    opacityLeftArrow.textContent = '<';
+    opacityLeftArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -304,7 +1363,20 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,f.addEventListener("click",()=>{let e=Math.max(parseFloat(h.min),Math.round((parseFloat(h.value)-.1)*10)/10);h.value=e,currentOpacity=e,b.textContent=e.toString(),x(e),saveSettings(),checkAndApplyBackground()});let $=document.createElement("button");function x(e){let t=document.getElementById("client-bg-container");if(t){let o=t.querySelector(".client-bg-layer:last-child");o?(o.style.opacity=e,console.log(`Updated background opacity to ${e}`)):console.log("No background layer found to update opacity")}else console.log("No background container found to update opacity")}$.textContent=">",$.style.cssText=`
+    `;
+    opacityLeftArrow.addEventListener('click', () => {
+        const step = 0.1;
+        const newValue = Math.max(parseFloat(opacitySlider.min), Math.round((parseFloat(opacitySlider.value) - step) * 10) / 10);
+        opacitySlider.value = newValue;
+        storedOpacity = newValue; // Update storedOpacity
+        opacityValue.textContent = newValue.toString();
+        currentOpacity = storedOpacity; // Sync currentOpacity
+        saveSettings();
+        checkAndApplyBackground();
+    });
+    const opacityRightArrow = document.createElement('button');
+    opacityRightArrow.textContent = '>';
+    opacityRightArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -315,22 +1387,183 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,$.addEventListener("click",()=>{let e=Math.min(parseFloat(h.max),Math.round((parseFloat(h.value)+.1)*10)/10);h.value=e,currentOpacity=e,b.textContent=e.toString(),x(e),saveSettings(),checkAndApplyBackground()}),f.addEventListener("mouseover",()=>{f.style.color="#f0e6d2",f.style.borderColor="#c8aa6e"}),f.addEventListener("mouseout",()=>{f.style.color="#cdbe91",f.style.borderColor="#785a28"}),$.addEventListener("mouseover",()=>{$.style.color="#f0e6d2",$.style.borderColor="#c8aa6e"}),$.addEventListener("mouseout",()=>{$.style.color="#cdbe91",$.style.borderColor="#785a28"}),m.appendChild(f),m.appendChild(h),m.appendChild($),m.appendChild(b),l.appendChild(m),h.addEventListener("input",()=>{currentOpacity=parseFloat(h.value),b.textContent=currentOpacity.toString(),x(currentOpacity),saveSettings(),checkAndApplyBackground()});let v=document.createElement("div");v.className="toggle-btn",v.style.cssText="margin-bottom: 15px;";let y=document.createElement("span");y.textContent="Keep background on all screens:";let k=document.createElement("label");k.className="toggle-switch";let _=document.createElement("input");_.type="checkbox",_.checked=persistBackground;let w=document.createElement("span");w.className="toggle-slider",k.appendChild(_),k.appendChild(w),v.appendChild(y),v.appendChild(k),l.appendChild(v),_.addEventListener("change",()=>{persistBackground=_.checked,saveSettings(),checkAndApplyBackground()});let C=document.createElement("div");C.className="toggle-btn",C.style.cssText="margin-bottom: 15px;";let L=document.createElement("span");L.textContent="Centered Splash:";let E=document.createElement("label");E.className="toggle-switch";let S=document.createElement("input");S.type="checkbox",S.checked=centeredSplash;let T=document.createElement("span");T.className="toggle-slider",E.appendChild(S),E.appendChild(T),C.appendChild(L),C.appendChild(E),l.appendChild(C),S.addEventListener("change",()=>{centeredSplash=S.checked,saveSettings(),checkAndApplyBackground()});let P=document.createElement("div");P.className="toggle-btn",P.style.cssText="margin-bottom: 15px;";let I=document.createElement("span");I.textContent="Enable TFT Content:";let B=document.createElement("label");B.className="toggle-switch";let z=document.createElement("input");z.type="checkbox",z.checked=!1!==DataStore.get("tftEnabled");let N=document.createElement("span");N.className="toggle-slider",B.appendChild(z),B.appendChild(N),P.appendChild(I),P.appendChild(B),l.appendChild(P),z.addEventListener("change",()=>{let e=z.checked;if(DataStore.set("tftEnabled",e),!e){let t=DataStore.get("selectedSkin");t&&t.isTFT&&(DataStore.set("selectedSkin",null),removeBackground(),console.log("Cleared selected TFT skin"))}saveSettings();let o=document.getElementById("client-bg-customizer-ui");if(o){generatePreviewGroups("champion");let a=o.querySelector(".main-window");a&&window.renderSkins&&window.renderSkins(previewGroups)}});let F=document.createElement("h4");F.textContent="Shuffle Settings",F.style.cssText=`
+    `;
+    opacityRightArrow.addEventListener('click', () => {
+        const step = 0.1;
+        const newValue = Math.min(parseFloat(opacitySlider.max), Math.round((parseFloat(opacitySlider.value) + step) * 10) / 10);
+        opacitySlider.value = newValue;
+        storedOpacity = newValue; // Update storedOpacity
+        opacityValue.textContent = newValue.toString();
+        currentOpacity = storedOpacity; // Sync currentOpacity
+        saveSettings();
+        checkAndApplyBackground();
+    });
+    opacitySlider.addEventListener('input', () => {
+        storedOpacity = parseFloat(opacitySlider.value); // Update storedOpacity
+        opacityValue.textContent = storedOpacity.toString();
+        currentOpacity = storedOpacity; // Sync currentOpacity
+        saveSettings();
+        checkAndApplyBackground();
+    });
+    opacityLeftArrow.addEventListener('mouseover', () => { opacityLeftArrow.style.color = '#f0e6d2'; opacityLeftArrow.style.borderColor = '#c8aa6e'; });
+    opacityLeftArrow.addEventListener('mouseout', () => { opacityLeftArrow.style.color = '#cdbe91'; opacityLeftArrow.style.borderColor = '#785a28'; });
+    opacityRightArrow.addEventListener('mouseover', () => { opacityRightArrow.style.color = '#f0e6d2'; opacityRightArrow.style.borderColor = '#c8aa6e'; });
+    opacityRightArrow.addEventListener('mouseout', () => { opacityRightArrow.style.color = '#cdbe91'; opacityRightArrow.style.borderColor = '#785a28'; });
+    opacityContainer.appendChild(opacityLeftArrow);
+    opacityContainer.appendChild(opacitySlider);
+    opacityContainer.appendChild(opacityRightArrow);
+    opacityContainer.appendChild(opacityValue);
+    settingsContent.appendChild(opacityContainer);
+
+    const persistContainer = document.createElement('div');
+    persistContainer.className = 'toggle-btn';
+    persistContainer.style.cssText = `margin-bottom: 15px;`;
+    const persistLabel = document.createElement('span');
+    persistLabel.textContent = 'Keep background on all screens:';
+    const persistSwitch = document.createElement('label');
+    persistSwitch.className = 'toggle-switch';
+    const persistInput = document.createElement('input');
+    persistInput.type = 'checkbox';
+    persistInput.checked = persistBackground;
+    const persistSlider = document.createElement('span');
+    persistSlider.className = 'toggle-slider';
+    persistSwitch.appendChild(persistInput);
+    persistSwitch.appendChild(persistSlider);
+    persistContainer.appendChild(persistLabel);
+    persistContainer.appendChild(persistSwitch);
+    settingsContent.appendChild(persistContainer);
+
+    persistInput.addEventListener('change', () => {
+        persistBackground = persistInput.checked;
+        saveSettings();
+        checkAndApplyBackground();
+    });
+
+    const centeredContainer = document.createElement('div');
+    centeredContainer.className = 'toggle-btn';
+    centeredContainer.style.cssText = `margin-bottom: 15px;`;
+    const centeredLabel = document.createElement('span');
+    centeredLabel.textContent = 'Centered Splash:';
+    const centeredSwitch = document.createElement('label');
+    centeredSwitch.className = 'toggle-switch';
+    const centeredInput = document.createElement('input');
+    centeredInput.type = 'checkbox';
+    centeredInput.checked = centeredSplash;
+    const centeredSlider = document.createElement('span');
+    centeredSlider.className = 'toggle-slider';
+    centeredSwitch.appendChild(centeredInput);
+    centeredSwitch.appendChild(centeredSlider);
+    centeredContainer.appendChild(centeredLabel);
+    centeredContainer.appendChild(centeredSwitch);
+    settingsContent.appendChild(centeredContainer);
+
+    centeredInput.addEventListener('change', () => {
+        centeredSplash = centeredInput.checked;
+        saveSettings();
+        checkAndApplyBackground();
+    });
+
+    const tftContainer = document.createElement('div');
+    tftContainer.className = 'toggle-btn';
+    tftContainer.style.cssText = `margin-bottom: 15px;`;
+    const tftLabel = document.createElement('span');
+    tftLabel.textContent = 'Enable TFT Content:';
+    const tftSwitch = document.createElement('label');
+    tftSwitch.className = 'toggle-switch';
+    const tftInput = document.createElement('input');
+    tftInput.type = 'checkbox';
+    tftInput.checked = DataStore.get('tftEnabled') !== false;
+    const tftSlider = document.createElement('span');
+    tftSlider.className = 'toggle-slider';
+    tftSwitch.appendChild(tftInput);
+    tftSwitch.appendChild(tftSlider);
+    tftContainer.appendChild(tftLabel);
+    tftContainer.appendChild(tftSwitch);
+    settingsContent.appendChild(tftContainer);
+
+    tftInput.addEventListener('change', () => {
+        const tftEnabled = tftInput.checked;
+        DataStore.set('tftEnabled', tftEnabled);
+        if (!tftEnabled) {
+            const selectedSkin = DataStore.get('selectedSkin');
+            if (selectedSkin && selectedSkin.isTFT) {
+                DataStore.set('selectedSkin', null);
+                removeBackground();
+                console.log('Cleared selected TFT skin');
+            }
+        }
+        saveSettings();
+        const customizerUI = document.getElementById('client-bg-customizer-ui');
+        if (customizerUI) {
+            generatePreviewGroups('champion');
+            const mainWindow = customizerUI.querySelector('.main-window');
+            if (mainWindow && window.renderSkins) {
+                window.renderSkins(previewGroups);
+            }
+        }
+    });
+
+    const shuffleSettingsTitle = document.createElement('h4');
+    shuffleSettingsTitle.textContent = 'Shuffle Settings';
+    shuffleSettingsTitle.style.cssText = `
         color: #f0e6d2;
         font-size: 18px;
         font-weight: bold;
         margin: 10px 0 5px 0;
         text-transform: uppercase;
-    `,l.appendChild(F);let A=document.createElement("hr");A.style.cssText=`
+    `;
+    settingsContent.appendChild(shuffleSettingsTitle);
+
+    const separator = document.createElement('hr');
+    separator.style.cssText = `
         border: 0;
         border-top: 1px solid #785a28;
         margin: 10px 0;
-    `,l.appendChild(A);let D=document.createElement("div");D.className="toggle-btn",D.style.cssText="margin-bottom: 15px;";let O=document.createElement("span");O.textContent="Cycle Shuffle:";let q=document.createElement("label");q.className="toggle-switch";let G=document.createElement("input");G.type="checkbox",G.checked=cycleShuffleEnabled;let U=document.createElement("span");U.className="toggle-slider",q.appendChild(G),q.appendChild(U),D.appendChild(O),D.appendChild(q),l.appendChild(D),G.addEventListener("change",()=>{cycleShuffleEnabled=G.checked,saveSettings()});let j=document.createElement("label");j.textContent="Cycle Shuffle Interval (Seconds):",j.style.cssText="margin-bottom: 5px;",l.appendChild(j);let M=document.createElement("div");M.style.cssText=`
+    `;
+    settingsContent.appendChild(separator);
+
+    const cycleShuffleContainer = document.createElement('div');
+    cycleShuffleContainer.className = 'toggle-btn';
+    cycleShuffleContainer.style.cssText = `margin-bottom: 15px;`;
+    const cycleShuffleLabel = document.createElement('span');
+    cycleShuffleLabel.textContent = 'Cycle Shuffle:';
+    const cycleShuffleSwitch = document.createElement('label');
+    cycleShuffleSwitch.className = 'toggle-switch';
+    const cycleShuffleInput = document.createElement('input');
+    cycleShuffleInput.type = 'checkbox';
+    cycleShuffleInput.checked = cycleShuffleEnabled;
+    const cycleShuffleSlider = document.createElement('span');
+    cycleShuffleSlider.className = 'toggle-slider';
+    cycleShuffleSwitch.appendChild(cycleShuffleInput);
+    cycleShuffleSwitch.appendChild(cycleShuffleSlider);
+    cycleShuffleContainer.appendChild(cycleShuffleLabel);
+    cycleShuffleContainer.appendChild(cycleShuffleSwitch);
+    settingsContent.appendChild(cycleShuffleContainer);
+
+    cycleShuffleInput.addEventListener('change', () => {
+        cycleShuffleEnabled = cycleShuffleInput.checked;
+        saveSettings();
+    });
+
+    const cycleIntervalLabel = document.createElement('label');
+    cycleIntervalLabel.textContent = 'Cycle Shuffle Interval (Seconds):';
+    cycleIntervalLabel.style.cssText = `margin-bottom: 5px;`;
+    settingsContent.appendChild(cycleIntervalLabel);
+
+    const cycleIntervalContainer = document.createElement('div');
+    cycleIntervalContainer.style.cssText = `
         display: flex;
         align-items: center;
         gap: 15px;
         margin-bottom: 15px;
-    `;let V=document.createElement("input");V.type="range",V.min="10",V.max="300",V.step="1",V.value=cycleInterval,V.style.cssText=`
+    `;
+    const cycleIntervalSlider = document.createElement('input');
+    cycleIntervalSlider.type = 'range';
+    cycleIntervalSlider.min = '10';
+    cycleIntervalSlider.max = '300';
+    cycleIntervalSlider.step = '1';
+    cycleIntervalSlider.value = cycleInterval;
+    cycleIntervalSlider.style.cssText = `
         flex: 1;
         height: 8px;
         -webkit-appearance: none;
@@ -338,7 +1571,13 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 4px;
         outline: none;
-    `;let R=document.createElement("span");R.textContent=cycleInterval.toString(),R.style.width="40px";let H=document.createElement("button");H.textContent="<",H.style.cssText=`
+    `;
+    const cycleIntervalValue = document.createElement('span');
+    cycleIntervalValue.textContent = cycleInterval.toString();
+    cycleIntervalValue.style.width = '40px';
+    const cycleLeftArrow = document.createElement('button');
+    cycleLeftArrow.textContent = '<';
+    cycleLeftArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -349,7 +1588,18 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,H.addEventListener("click",()=>{let e=Math.max(parseInt(V.min),10*Math.round((parseInt(V.value)-10)/10));V.value=e,cycleInterval=e,R.textContent=e.toString(),saveSettings()});let Q=document.createElement("button");Q.textContent=">",Q.style.cssText=`
+    `;
+    cycleLeftArrow.addEventListener('click', () => {
+        const step = 10;
+        const newValue = Math.max(parseInt(cycleIntervalSlider.min), Math.round((parseInt(cycleIntervalSlider.value) - step) / step) * step);
+        cycleIntervalSlider.value = newValue;
+        cycleInterval = newValue;
+        cycleIntervalValue.textContent = newValue.toString();
+        saveSettings();
+    });
+    const cycleRightArrow = document.createElement('button');
+    cycleRightArrow.textContent = '>';
+    cycleRightArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -360,12 +1610,50 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,Q.addEventListener("click",()=>{let e=Math.min(parseInt(V.max),10*Math.round((parseInt(V.value)+10)/10));V.value=e,cycleInterval=e,R.textContent=e.toString(),saveSettings()}),H.addEventListener("mouseover",()=>{H.style.color="#f0e6d2",H.style.borderColor="#c8aa6e"}),H.addEventListener("mouseout",()=>{H.style.color="#cdbe91",H.style.borderColor="#785a28"}),Q.addEventListener("mouseover",()=>{Q.style.color="#f0e6d2",Q.style.borderColor="#c8aa6e"}),Q.addEventListener("mouseout",()=>{Q.style.color="#cdbe91",Q.style.borderColor="#785a28"}),M.appendChild(H),M.appendChild(V),M.appendChild(Q),M.appendChild(R),l.appendChild(M),V.addEventListener("input",()=>{cycleInterval=parseInt(V.value),R.textContent=cycleInterval.toString(),saveSettings()});let K=document.createElement("label");K.textContent="Transition Duration (Seconds):",K.style.cssText="margin-bottom: 5px;",l.appendChild(K);let W=document.createElement("div");W.style.cssText=`
+    `;
+    cycleRightArrow.addEventListener('click', () => {
+        const step = 10;
+        const newValue = Math.min(parseInt(cycleIntervalSlider.max), Math.round((parseInt(cycleIntervalSlider.value) + step) / step) * step);
+        cycleIntervalSlider.value = newValue;
+        cycleInterval = newValue;
+        cycleIntervalValue.textContent = newValue.toString();
+        saveSettings();
+    });
+    cycleLeftArrow.addEventListener('mouseover', () => { cycleLeftArrow.style.color = '#f0e6d2'; cycleLeftArrow.style.borderColor = '#c8aa6e'; });
+    cycleLeftArrow.addEventListener('mouseout', () => { cycleLeftArrow.style.color = '#cdbe91'; cycleLeftArrow.style.borderColor = '#785a28'; });
+    cycleRightArrow.addEventListener('mouseover', () => { cycleRightArrow.style.color = '#f0e6d2'; cycleRightArrow.style.borderColor = '#c8aa6e'; });
+    cycleRightArrow.addEventListener('mouseout', () => { cycleRightArrow.style.color = '#cdbe91'; cycleRightArrow.style.borderColor = '#785a28'; });
+    cycleIntervalContainer.appendChild(cycleLeftArrow);
+    cycleIntervalContainer.appendChild(cycleIntervalSlider);
+    cycleIntervalContainer.appendChild(cycleRightArrow);
+    cycleIntervalContainer.appendChild(cycleIntervalValue);
+    settingsContent.appendChild(cycleIntervalContainer);
+
+    cycleIntervalSlider.addEventListener('input', () => {
+        cycleInterval = parseInt(cycleIntervalSlider.value);
+        cycleIntervalValue.textContent = cycleInterval.toString();
+        saveSettings();
+    });
+
+    const transitionDurationLabel = document.createElement('label');
+    transitionDurationLabel.textContent = 'Transition Duration (Seconds):';
+    transitionDurationLabel.style.cssText = `margin-bottom: 5px;`;
+    settingsContent.appendChild(transitionDurationLabel);
+
+    const transitionDurationContainer = document.createElement('div');
+    transitionDurationContainer.style.cssText = `
         display: flex;
         align-items: center;
         gap: 15px;
         margin-bottom: 15px;
-    `;let Y=document.createElement("input");Y.type="range",Y.min="0",Y.max="5",Y.step="0.1",Y.value=transitionDuration,Y.style.cssText=`
+    `;
+    const transitionDurationSlider = document.createElement('input');
+    transitionDurationSlider.type = 'range';
+    transitionDurationSlider.min = '0';
+    transitionDurationSlider.max = '5';
+    transitionDurationSlider.step = '0.1';
+    transitionDurationSlider.value = transitionDuration;
+    transitionDurationSlider.style.cssText = `
         flex: 1;
         height: 8px;
         -webkit-appearance: none;
@@ -373,7 +1661,13 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 4px;
         outline: none;
-    `;let X=document.createElement("span");X.textContent=transitionDuration.toString(),X.style.width="40px";let Z=document.createElement("button");Z.textContent="<",Z.style.cssText=`
+    `;
+    const transitionDurationValue = document.createElement('span');
+    transitionDurationValue.textContent = transitionDuration.toString();
+    transitionDurationValue.style.width = '40px';
+    const durationLeftArrow = document.createElement('button');
+    durationLeftArrow.textContent = '<';
+    durationLeftArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -384,7 +1678,18 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,Z.addEventListener("click",()=>{let e=Math.max(parseFloat(Y.min),Math.round((parseFloat(Y.value)-.1)*10)/10);Y.value=e,transitionDuration=e,X.textContent=e.toString(),saveSettings()});let J=document.createElement("button");J.textContent=">",J.style.cssText=`
+    `;
+    durationLeftArrow.addEventListener('click', () => {
+        const step = 0.1;
+        const newValue = Math.max(parseFloat(transitionDurationSlider.min), Math.round((parseFloat(transitionDurationSlider.value) - step) * 10) / 10);
+        transitionDurationSlider.value = newValue;
+        transitionDuration = newValue;
+        transitionDurationValue.textContent = newValue.toString();
+        saveSettings();
+    });
+    const durationRightArrow = document.createElement('button');
+    durationRightArrow.textContent = '>';
+    durationRightArrow.style.cssText = `
         color: #cdbe91;
         font-size: 14px;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
@@ -395,7 +1700,38 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         transition: color 0.2s, border-color 0.2s;
-    `,J.addEventListener("click",()=>{let e=Math.min(parseFloat(Y.max),Math.round((parseFloat(Y.value)+.1)*10)/10);Y.value=e,transitionDuration=e,X.textContent=e.toString(),saveSettings()}),Z.addEventListener("mouseover",()=>{Z.style.color="#f0e6d2",Z.style.borderColor="#c8aa6e"}),Z.addEventListener("mouseout",()=>{Z.style.color="#cdbe91",Z.style.borderColor="#785a28"}),J.addEventListener("mouseover",()=>{J.style.color="#f0e6d2",J.style.borderColor="#c8aa6e"}),J.addEventListener("mouseout",()=>{J.style.color="#cdbe91",J.style.borderColor="#785a28"}),W.appendChild(Z),W.appendChild(Y),W.appendChild(J),W.appendChild(X),l.appendChild(W),Y.addEventListener("input",()=>{transitionDuration=parseFloat(Y.value),X.textContent=transitionDuration.toString(),saveSettings()}),a.appendChild(l),o.appendChild(a);let ee=document.createElement("button");ee.textContent="Close",ee.className="settings-close-button",ee.style.cssText=`
+    `;
+    durationRightArrow.addEventListener('click', () => {
+        const step = 0.1;
+        const newValue = Math.min(parseFloat(transitionDurationSlider.max), Math.round((parseFloat(transitionDurationSlider.value) + step) * 10) / 10);
+        transitionDurationSlider.value = newValue;
+        transitionDuration = newValue;
+        transitionDurationValue.textContent = newValue.toString();
+        saveSettings();
+    });
+    durationLeftArrow.addEventListener('mouseover', () => { durationLeftArrow.style.color = '#f0e6d2'; durationLeftArrow.style.borderColor = '#c8aa6e'; });
+    durationLeftArrow.addEventListener('mouseout', () => { durationLeftArrow.style.color = '#cdbe91'; durationLeftArrow.style.borderColor = '#785a28'; });
+    durationRightArrow.addEventListener('mouseover', () => { durationRightArrow.style.color = '#f0e6d2'; durationRightArrow.style.borderColor = '#c8aa6e'; });
+    durationRightArrow.addEventListener('mouseout', () => { durationRightArrow.style.color = '#cdbe91'; durationRightArrow.style.borderColor = '#785a28'; });
+    transitionDurationContainer.appendChild(durationLeftArrow);
+    transitionDurationContainer.appendChild(transitionDurationSlider);
+    transitionDurationContainer.appendChild(durationRightArrow);
+    transitionDurationContainer.appendChild(transitionDurationValue);
+    settingsContent.appendChild(transitionDurationContainer);
+
+    transitionDurationSlider.addEventListener('input', () => {
+        transitionDuration = parseFloat(transitionDurationSlider.value);
+        transitionDurationValue.textContent = transitionDuration.toString();
+        saveSettings();
+    });
+
+    innerContainer.appendChild(settingsContent);
+    settingsContainer.appendChild(innerContainer);
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.className = 'settings-close-button';
+    closeButton.style.cssText = `
         margin-top: 20px;
         margin-left: auto;
         margin-right: auto;
@@ -413,7 +1749,135 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 2px solid #785a28;
         box-shadow: 0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13;
         transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
-    `,ee.addEventListener("mouseover",()=>{ee.style.color="#f0e6d2",ee.style.borderColor="#c8aa6e",ee.style.boxShadow="0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13"}),ee.addEventListener("mouseout",()=>{ee.style.color="#cdbe91",ee.style.borderColor="#785a28",ee.style.boxShadow="0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13"}),ee.addEventListener("click",()=>{console.log("Close button clicked"),t.remove(),settingsVisible=!1;let o=document.getElementById("client-bg-customizer-ui-wrapper");if(o){console.log("Restoring customizer UI"),o.style.display="block";let a=document.getElementById("client-bg-customizer-ui");if(a){let n=a.querySelector(".custom-dropdown:not(.filter-dropdown):not(.sort-dropdown)");if(n){console.log("Type dropdown found");let l=n.querySelector(".dropdown-toggle"),r=n.querySelector(".dropdown-menu");if(l&&r){console.log("Updating dropdown to Champion"),l.textContent="Champion";let i=r.querySelector('.dropdown-item[data-value="champion"]');i&&(r.querySelectorAll(".dropdown-item").forEach(e=>e.classList.remove("selected")),i.classList.add("selected"),console.log("Simulating Champion dropdown click"),i.click())}}else{console.log("Type dropdown not found, falling back to manual refresh"),generatePreviewGroups("champion");let s=a.querySelector(".main-window");s&&window.renderSkins?(console.log("Manually rendering skins"),window.renderSkins(previewGroups,currentSearchQuery)):console.log("renderSkins not available or mainWindow not found")}}else console.log("Customizer UI not found")}else console.log("Customizer wrapper not found, recreating UI"),createClientBackgroundCustomizerUI(e)}),o.appendChild(ee),t.appendChild(o),e.appendChild(t)}function startShuffleCycle(e,t){if(!cycleShuffleEnabled)return;shuffleCycleIntervalId&&(clearInterval(shuffleCycleIntervalId),console.log("Cleared previous shuffle cycle"));let o=!1!==DataStore.get("tftEnabled");shuffleCycleIntervalId=setInterval(()=>{let a=[];if(t&&e.length>0?0===(a=e.filter(e=>o||!e.isTFT)).length&&(a=previewGroups.flatMap(e=>e.items.filter(e=>o||!e.isTFT)),console.log("No valid favorites, falling back to all skins")):a=previewGroups.flatMap(e=>e.items.filter(e=>o||!e.isTFT)),0===a.length){console.log("No items available for shuffle cycle"),clearInterval(shuffleCycleIntervalId),shuffleCycleIntervalId=null;return}let n=a[Math.floor(Math.random()*a.length)];DataStore.set("selectedSkin",{name:n.name,tilePath:n.tilePath,splashPath:n.splashPath,uncenteredSplashPath:n.uncenteredSplashPath,skinLineId:n.skinLineId,skinLineName:n.skinLineName,isTFT:n.isTFT}),applyBackground(n),console.log(`Shuffle cycle applied: ${n.name}`)},1e3*cycleInterval),console.log(`Started shuffle cycle with interval ${cycleInterval} seconds`)}function createClientBackgroundCustomizerUI(e){let t=DataStore.get("selectedSkin"),o=DataStore.get("favoriteSkins")||[],a=DataStore.get("favoritesToggled")||!1,n=!0,l="",r=document.getElementById("client-bg-customizer-ui-wrapper");r&&(console.warn("Existing customizer wrapper found, removing to prevent duplicates"),r.remove());let i=document.querySelector(".client-bg-customizer-backdrop");i&&(console.warn("Existing backdrop found, removing to prevent duplicates"),i.remove());let s=document.createElement("div");s.className="client-bg-customizer-backdrop",s.style.cssText=`
+    `;
+    closeButton.addEventListener('mouseover', () => {
+        closeButton.style.color = '#f0e6d2';
+        closeButton.style.borderColor = '#c8aa6e';
+        closeButton.style.boxShadow = '0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13';
+    });
+    closeButton.addEventListener('mouseout', () => {
+        closeButton.style.color = '#cdbe91';
+        closeButton.style.borderColor = '#785a28';
+        closeButton.style.boxShadow = '0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13';
+    });
+    closeButton.addEventListener('click', () => {
+        console.log('Close button clicked');
+        settingsWrapper.remove();
+        settingsVisible = false;
+        const customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+        if (customizerWrapper) {
+            console.log('Restoring customizer UI');
+            customizerWrapper.style.display = 'block';
+            const customizerUI = document.getElementById('client-bg-customizer-ui');
+            if (customizerUI) {
+                const typeDropdown = customizerUI.querySelector('.custom-dropdown:not(.filter-dropdown):not(.sort-dropdown)');
+                if (typeDropdown) {
+                    console.log('Type dropdown found');
+                    const typeToggle = typeDropdown.querySelector('.dropdown-toggle');
+                    const typeMenu = typeDropdown.querySelector('.dropdown-menu');
+                    if (typeToggle && typeMenu) {
+                        console.log('Updating dropdown to Champion');
+                        typeToggle.textContent = 'Champion';
+                        const championItem = typeMenu.querySelector('.dropdown-item[data-value="champion"]');
+                        if (championItem) {
+                            typeMenu.querySelectorAll('.dropdown-item').forEach(item => item.classList.remove('selected'));
+                            championItem.classList.add('selected');
+                            console.log('Simulating Champion dropdown click');
+                            championItem.click();
+                        }
+                    }
+                } else {
+                    console.log('Type dropdown not found, falling back to manual refresh');
+                    generatePreviewGroups('champion');
+                    const mainWindow = customizerUI.querySelector('.main-window');
+                    if (mainWindow && window.renderSkins) {
+                        console.log('Manually rendering skins');
+                        window.renderSkins(previewGroups, currentSearchQuery);
+                    } else {
+                        console.log('renderSkins not available or mainWindow not found');
+                    }
+                }
+            } else {
+                console.log('Customizer UI not found');
+            }
+        } else {
+            console.log('Customizer wrapper not found, recreating UI');
+            createClientBackgroundCustomizerUI(container);
+        }
+    });
+    settingsContainer.appendChild(closeButton);
+
+    settingsWrapper.appendChild(settingsContainer);
+    container.appendChild(settingsWrapper);
+}
+
+function startShuffleCycle(favoriteSkins, isFavoritesToggled) {
+    if (!cycleShuffleEnabled) return;
+    if (shuffleCycleIntervalId) {
+        clearInterval(shuffleCycleIntervalId);
+        console.log('Cleared previous shuffle cycle');
+    }
+    const tftEnabled = DataStore.get('tftEnabled') !== false;
+    shuffleCycleIntervalId = setInterval(() => {
+        let allItems = [];
+        if (isFavoritesToggled && favoriteSkins.length > 0) {
+            allItems = favoriteSkins.filter(item => tftEnabled || !item.isTFT);
+            // If no valid favorites (e.g., only TFT favorites when TFT is disabled), fall back to all skins
+            if (allItems.length === 0) {
+                allItems = previewGroups.flatMap(group => 
+                    group.items.filter(item => tftEnabled || !item.isTFT)
+                );
+                console.log('No valid favorites, falling back to all skins');
+            }
+        } else {
+            allItems = previewGroups.flatMap(group => 
+                group.items.filter(item => tftEnabled || !item.isTFT)
+            );
+        }
+        if (allItems.length === 0) {
+            console.log('No items available for shuffle cycle');
+            clearInterval(shuffleCycleIntervalId);
+            shuffleCycleIntervalId = null;
+            return;
+        }
+        const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+        DataStore.set('selectedSkin', {
+            name: randomItem.name,
+            tilePath: randomItem.tilePath,
+            splashPath: randomItem.splashPath,
+            uncenteredSplashPath: randomItem.uncenteredSplashPath,
+            skinLineId: randomItem.skinLineId,
+            skinLineName: randomItem.skinLineName,
+            isTFT: randomItem.isTFT
+        });
+        applyBackground(randomItem);
+        console.log(`Shuffle cycle applied: ${randomItem.name}`);
+    }, cycleInterval * 1000);
+    console.log(`Started shuffle cycle with interval ${cycleInterval} seconds`);
+}
+
+function createClientBackgroundCustomizerUI(container) {
+    const savedSkin = DataStore.get('selectedSkin');
+    let favoriteSkins = DataStore.get('favoriteSkins') || [];
+    let isFavoritesToggled = DataStore.get('favoritesToggled') || false;
+    let isInitialLoad = true;
+    let currentSearchQuery = '';
+
+    // Remove existing wrapper and backdrop to prevent duplicates
+    let existingWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+    if (existingWrapper) {
+        console.warn('Existing customizer wrapper found, removing to prevent duplicates');
+        existingWrapper.remove();
+    }
+    let existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
+    if (existingBackdrop) {
+        console.warn('Existing backdrop found, removing to prevent duplicates');
+        existingBackdrop.remove();
+    }
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'client-bg-customizer-backdrop';
+    backdrop.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
@@ -421,13 +1885,22 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         height: 100%;
         background: rgba(0, 0, 0, 0.7);
         z-index: 9997;
-    `;let d=document.createElement("div");d.id="client-bg-customizer-ui-wrapper",d.style.cssText=`
+    `;
+
+    const uiWrapper = document.createElement('div');
+    uiWrapper.id = 'client-bg-customizer-ui-wrapper';
+    uiWrapper.style.cssText = `
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 9998;
-    `;let c=document.createElement("div");c.id="client-bg-customizer-ui",c.className="lol-custom-ui",c.style.cssText=`
+    `;
+
+    const uiContainer = document.createElement('div');
+    uiContainer.id = 'client-bg-customizer-ui';
+    uiContainer.className = 'lol-custom-ui';
+    uiContainer.style.cssText = `
         padding: 0;
         width: 800px;
         height: 600px;
@@ -439,7 +1912,13 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
         border: 1px solid #785a28;
         border-radius: 2px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
-    `;let p=document.getElementById("client-bg-customizer-style");p||((p=document.createElement("style")).id="client-bg-customizer-style",p.textContent=`
+    `;
+
+    let styleElement = document.getElementById('client-bg-customizer-style');
+    if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'client-bg-customizer-style';
+        styleElement.textContent = `
             .lol-custom-ui {
                 font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
                 color: #a09b8c;
@@ -1029,7 +2508,551 @@ let uiVisible=!1,debounceTimeout,skinData=[],universeData=[],skinLineData=[],tft
                 opacity: 1;
                 transition: 0.2s !important;
             }
-        `,document.head.appendChild(p));let u=document.createElement("div");u.className="header";let g=document.createElement("h3");g.textContent="BACKGROUND CUSTOMIZER",u.appendChild(g);let m=document.createElement("div");m.className="lol-uikit-close-button",m.setAttribute("button-type","cog");let h=document.createElement("div");h.className="contents";let b=document.createElement("div");b.className="close-icon",h.appendChild(b),m.appendChild(h),m.addEventListener("click",()=>{if(settingsVisible){let t=document.getElementById("client-bg-settings-ui-wrapper");t&&t.remove(),settingsVisible=!1}else createSettingsUI(e),settingsVisible=!0,d.style.display="none"}),u.appendChild(m),c.appendChild(u);let f=document.createElement("div");f.className="search-bar";let $=document.createElement("input");$.placeholder="Search",$.style.width="40%";let x=document.createElement("div");x.className="custom-dropdown",x.style.width="150px";let v=document.createElement("div");v.className="dropdown-toggle",v.textContent="Champion";let y=document.createElement("ul");y.className="dropdown-menu";let k="champion";[{label:"Champion",value:"champion"},{label:"Universes",value:"universes"},{label:"Skinlines",value:"skinlines"}].forEach(e=>{let t=document.createElement("li");t.className="dropdown-item",t.textContent=e.label,t.dataset.value=e.value,"champion"===e.value&&t.classList.add("selected"),t.addEventListener("click",()=>{v.textContent=e.label,y.querySelectorAll(".dropdown-item").forEach(e=>e.classList.remove("selected")),t.classList.add("selected"),k=e.value,y.classList.remove("show"),console.log(`Selected type: ${k}`),generatePreviewGroups(k),B(previewGroups,l)}),y.appendChild(t)}),v.addEventListener("click",()=>{let e=y.classList.contains("show");document.querySelectorAll(".dropdown-menu").forEach(e=>e.classList.remove("show")),e||y.classList.add("show")}),x.appendChild(v),x.appendChild(y);let _=document.createElement("div");_.className="custom-dropdown filter-dropdown",_.style.width="120px";let w=document.createElement("div");w.className="dropdown-toggle",w.textContent=a?"Favorites":"All Skins";let C=document.createElement("ul");C.className="dropdown-menu";let L=a?"favorites":"all";["All Skins","Favorites"].forEach(e=>{let t=document.createElement("li");t.className="dropdown-item",t.textContent=e,t.dataset.value=e.toLowerCase().replace(" ",""),("Favorites"===e&&a||"All Skins"===e&&!a)&&t.classList.add("selected"),t.addEventListener("click",()=>{w.textContent=e,C.querySelectorAll(".dropdown-item").forEach(e=>e.classList.remove("selected")),t.classList.add("selected"),a="favorites"===(L=t.dataset.value),DataStore.set("favoritesToggled",a),C.classList.remove("show"),B(previewGroups,l,L)}),C.appendChild(t)}),_.appendChild(w),_.appendChild(C);let E=document.createElement("div");E.className="custom-dropdown",E.style.width="150px";let S=document.createElement("div");S.className="dropdown-toggle",S.textContent="Alphabetical▼";let T=document.createElement("ul");T.className="dropdown-menu";let P="alphabetical";[{label:"Alphabetical▼",value:"alphabetical"},{label:"Alphabetical▲",value:"alphabetical-reverse"}].forEach(e=>{let t=document.createElement("li");t.className="dropdown-item",t.textContent=e.label,t.dataset.value=e.value,"alphabetical"===e.value&&t.classList.add("selected"),t.addEventListener("click",()=>{S.textContent=e.label,T.querySelectorAll(".dropdown-item").forEach(e=>e.classList.remove("selected")),t.classList.add("selected"),P=e.value,T.classList.remove("show"),B(previewGroups,l,L,P)}),T.appendChild(t)}),E.appendChild(S),E.appendChild(T),[w,S].forEach(e=>{e.addEventListener("click",()=>{let t=e.nextElementSibling,o=t.classList.contains("show");document.querySelectorAll(".dropdown-menu").forEach(e=>e.classList.remove("show")),o||t.classList.add("show")})}),$.addEventListener("input",()=>{B(previewGroups,l=$.value.toLowerCase().trim(),L,P)}),f.appendChild($),f.appendChild(x),f.appendChild(_),f.appendChild(E),c.appendChild(f);let I=document.createElement("div");function B(e,o="",a="all",l="alphabetical"){let r=document.querySelector(".main-window");if(!r){console.error("Main window not found");return}r.innerHTML="";let i=JSON.parse(JSON.stringify(e)),s=DataStore.get("favoriteSkins")||[],d=a||document.querySelector(".filter-dropdown .dropdown-item.selected")?.dataset.value||"all",c=l||document.querySelector(".sort-dropdown .dropdown-item.selected")?.dataset.value||"alphabetical";if("favorites"===d){if(0===s.length){let p=document.createElement("div");p.className="no-favorites-message",p.textContent="No favorited skins",r.appendChild(p);return}i=i.map(e=>({title:e.title,items:e.items.filter(e=>s.some(t=>t.name===e.name&&t.isTFT===e.isTFT))})).filter(e=>e.items.length>0)}o&&(i=i.map(e=>({title:e.title,items:e.items.filter(t=>t.name.toLowerCase().includes(o)||e.title.toLowerCase().includes(o))})).filter(e=>e.items.length>0||e.title.toLowerCase().includes(o))),"alphabetical"===c?(i.sort((e,t)=>e.title.localeCompare(t.title)),i.forEach(e=>{e.items.sort((e,t)=>e.name.localeCompare(t.name))})):(i.sort((e,t)=>t.title.localeCompare(e.title)),i.forEach(e=>{e.items.sort((e,t)=>t.name.localeCompare(e.name))})),0!==i.length||o||"favorites"===d||(console.warn("No groups to render, regenerating with champion grouping"),generatePreviewGroups("champion"),i=previewGroups),i.forEach(e=>{let a=document.createElement("div");a.className="skin-group-title";let n=document.createElement("span");n.textContent=e.title,a.appendChild(n),a.dataset.groupTitle=e.title;let l=document.createElement("button");l.className="group-favorite-button";let i=e.items.every(e=>s.some(t=>t.name===e.name&&t.isTFT===e.isTFT));i&&l.classList.add("favorited"),l.addEventListener("click",()=>{let t=e.items.every(e=>s.some(t=>t.name===e.name&&t.isTFT===e.isTFT));if(t){s=s.filter(t=>!e.items.some(e=>e.name===t.name&&e.isTFT==e.isTFT)),l.classList.remove("favorited");let n=a.nextElementSibling.querySelectorAll(".favorite-button");n.forEach(e=>e.classList.remove("favorited"))}else{e.items.forEach(e=>{s.some(t=>t.name===e.name&&t.isTFT===e.isTFT)||s.push({name:e.name,tilePath:e.tilePath,splashPath:e.splashPath,uncenteredSplashPath:e.uncenteredSplashPath,skinLineId:e.skinLineId,skinLineName:e.skinLineName,isTFT:e.isTFT})}),l.classList.add("favorited");let r=a.nextElementSibling.querySelectorAll(".favorite-button");r.forEach(e=>e.classList.add("favorited"))}DataStore.set("favoriteSkins",s),B(previewGroups,o,d,c)}),a.appendChild(l),r.appendChild(a);let p=document.createElement("div");p.className="skin-group",e.items.forEach(a=>{let n=document.createElement("div");n.className="skin-container",n.style.position="relative";let l=document.createElement("div");l.className="skin-image",l.dataset.tilePath=a.tilePath||"",l.dataset.name=a.name,l.dataset.splashPath=a.splashPath,l.dataset.uncenteredSplashPath=a.uncenteredSplashPath,l.dataset.skinLineId=a.skinLineId||"",l.dataset.skinLineName=a.skinLineName||"",l.dataset.isTFT=a.isTFT?"true":"false",l.style.position="relative",l.style.boxSizing="border-box";let r=()=>{console.log(`Image failed to load for ${a.name}: ${a.tilePath}`),l.className="skin-image failed",l.style.backgroundImage="none";let e=document.createElement("div");e.className="failed-text",e.textContent="Failed to Load Preview",l.appendChild(e)};if(a.tilePath){l.style.backgroundImage=`url(${a.tilePath})`;let i=new Image;i.src=a.tilePath,i.onerror=r}else r();t&&t.name.trim().toLowerCase()===a.name.trim().toLowerCase()&&t.isTFT===a.isTFT&&l.classList.add("selected"),l.addEventListener("click",()=>{document.querySelectorAll(".skin-image").forEach(e=>e.classList.remove("selected")),l.classList.add("selected");let e={name:a.name,tilePath:a.tilePath,splashPath:a.splashPath,uncenteredSplashPath:a.uncenteredSplashPath,skinLineId:a.skinLineId,skinLineName:a.skinLineName,isTFT:a.isTFT};DataStore.set("selectedSkin",e),applyBackground(e)});let u=document.createElement("button");u.className="favorite-button",s.some(e=>e.name===a.name&&e.isTFT===a.isTFT)&&u.classList.add("favorited"),u.addEventListener("click",t=>{t.stopPropagation();let l=s.some(e=>e.name===a.name&&e.isTFT===a.isTFT);l?(s=s.filter(e=>!(e.name===a.name&&e.isTFT===a.isTFT)),u.classList.remove("favorited")):(s.push({name:a.name,tilePath:a.tilePath,splashPath:a.splashPath,uncenteredSplashPath:a.uncenteredSplashPath,skinLineId:a.skinLineId,skinLineName:a.skinLineName,isTFT:a.isTFT}),u.classList.add("favorited")),DataStore.set("favoriteSkins",s),window.favoriteSkins=s;let r=n.closest(".skin-group").previousElementSibling.querySelector(".group-favorite-button"),i=e.items.every(e=>s.some(t=>t.name===e.name&&t.isTFT===e.isTFT));r.classList.toggle("favorited",i),B(previewGroups,o,d,c)}),l.appendChild(u),n.appendChild(l);let g=document.createElement("div");g.className="skin-label",g.textContent=a.name,n.appendChild(g),p.appendChild(n)}),r.appendChild(p)}),t&&t.name&&n&&(setTimeout(()=>{let e=CSS.escape(t.name),o=`.skin-image[data-name="${e}"][data-is-tft="${t.isTFT}"]`,a=r.querySelector(o);a&&(a.classList.add("selected"),a.scrollIntoView({behavior:"smooth",block:"center"}))},200),n=!1),window.addMorePreviews=e=>{previewGroups.push(...e),B(previewGroups,o,d,c)}}I.className="main-window",c.appendChild(I);let z=document.createElement("div");z.className="bottom-bar";let N=document.createElement("button");N.textContent="RESET FAVORITES",N.addEventListener("click",()=>{o=[],DataStore.set("favoriteSkins",o),document.querySelectorAll(".favorite-button").forEach(e=>e.classList.remove("favorited")),document.querySelectorAll(".group-favorite-button").forEach(e=>e.classList.remove("favorited")),B(previewGroups,l,L,P)}),z.appendChild(N);let F=document.createElement("button");F.className="favorites-toggle",a&&F.classList.add("toggled");let A=document.createElement("div");A.className="toggle-container";let D=document.createElement("div");D.className="toggled",a&&D.classList.add("toggled-on");let O=document.createElement("div");O.className="toggle-button",A.appendChild(D),A.appendChild(O),F.appendChild(A),F.addEventListener("click",()=>{a=!a,DataStore.set("favoritesToggled",a),F.classList.toggle("toggled",a),D.classList.toggle("toggled-on",a),w.textContent=a?"Favorites":"All Skins",C.querySelectorAll(".dropdown-item").forEach(e=>{e.classList.toggle("selected",e.textContent===(a?"Favorites":"All Skins"))}),B(previewGroups,l,L=a?"favorites":"all",P)}),z.appendChild(F);let q=document.createElement("button");q.className="randomize-button",q.textContent="Shuffle",q.addEventListener("click",()=>{let e=[];if(0===(e=a&&o.length>0?o:previewGroups.flatMap(e=>e.items)).length){console.log("No items available to randomize");return}let t=e[Math.floor(Math.random()*e.length)];DataStore.set("selectedSkin",{name:t.name,tilePath:t.tilePath,splashPath:t.splashPath,uncenteredSplashPath:t.uncenteredSplashPath,skinLineId:t.skinLineId,skinLineName:t.skinLineName,isTFT:t.isTFT}),document.querySelectorAll(".skin-image").forEach(e=>e.classList.remove("selected"));let n=`.skin-image[data-name="${CSS.escape(t.name)}"][data-is-tft="${t.isTFT}"]`,l=I.querySelector(n);l&&(l.classList.add("selected"),l.scrollIntoView({behavior:"smooth",block:"center"})),applyBackground(t),cycleShuffleEnabled&&(startShuffleCycle(o,a),d.remove(),s.remove(),uiVisible=!1,checkAndCreateButton())}),z.appendChild(q);let G=document.createElement("button");G.textContent="PROFILES",G.addEventListener("click",()=>{shuffleCycleIntervalId&&(clearInterval(shuffleCycleIntervalId),shuffleCycleIntervalId=null,console.log("Stopped shuffle cycle for profiles UI")),createProfilesUI(e)}),z.appendChild(G);let U=document.createElement("button");U.textContent="Confirm",U.addEventListener("click",()=>{let e=I.querySelector(".skin-image.selected");if(e){let t={name:e.dataset.name,tilePath:e.dataset.tilePath,splashPath:e.dataset.splashPath,uncenteredSplashPath:e.dataset.uncenteredSplashPath,skinLineId:e.dataset.skinLineId,skinLineName:e.dataset.skinLineName,isTFT:"true"===e.dataset.isTFT};DataStore.set("selectedSkin",t),applyBackground(t)}d.remove(),s.remove(),uiVisible=!1,checkAndCreateButton()}),z.appendChild(U),c.appendChild(z),d.appendChild(c),shuffleCycleIntervalId&&(clearInterval(shuffleCycleIntervalId),shuffleCycleIntervalId=null,console.log("Stopped existing shuffle cycle")),e.appendChild(s),e.appendChild(d),generatePreviewGroups("champion"),B(previewGroups,l,L,P)}window.addEventListener("load",()=>{console.log("Pengu Loader Client Background Customizer plugin loading..."),loadSavedSettings(),Promise.allSettled([fetch("https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/skins.json").then(e=>{if(!e.ok)throw Error(`HTTP error! Status: ${e.status}`);return e.json()}).then(e=>{skinData=Object.values(e).map(e=>{let t=e.tilePath?e.tilePath.replace(/^\/lol-game-data\/assets\/ASSETS\//i,"").toLowerCase():"",o=e.splashPath?e.splashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i,"").toLowerCase():"",a=e.uncenteredSplashPath?e.uncenteredSplashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i,"").toLowerCase():"";return{...e,tilePath:t?`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${t}`:"",splashPath:o?`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${o}`:"",uncenteredSplashPath:a?`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${a}`:""}}),console.log("Fetched skins.json, skinData length:",skinData.length)}),fetch("https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/universes.json").then(e=>{if(!e.ok)throw Error(`HTTP error! Status: ${e.status}`);return e.json()}).then(e=>{universeData=Array.isArray(e)?e:[],console.log("Fetched universes.json, universeData length:",universeData.length)}),fetch("https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/skinlines.json").then(e=>{if(!e.ok)throw Error(`HTTP error! Status: ${e.status}`);return e.json()}).then(e=>{skinLineData=Array.isArray(e)?e:[],console.log("Fetched skinlines.json, skinLineData length:",skinLineData.length)}),fetch("https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/tftrotationalshopitemdata.json").then(e=>{if(!e.ok)throw Error(`HTTP error! Status: ${e.status}`);return e.json()}).then(e=>{tftData=(tftData=Array.isArray(e)?e:[]).map(e=>{let t=e.backgroundTextureLCU?e.backgroundTextureLCU.replace(/^ASSETS\//i,"").toLowerCase():"",o=e.standaloneLoadoutsLargeIcon?e.standaloneLoadoutsLargeIcon.replace(/^ASSETS\//i,"").toLowerCase():"";return{...e,backgroundTextureLCU:t?`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${t}`:"",standaloneLoadoutsLargeIcon:o?`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${o}`:"",isTFT:!0}}),console.log("Fetched tftrotationalshopitemdata.json, tftData length:",tftData.length)})]).then(e=>{let t=e.filter(e=>"rejected"===e.status).map(e=>e.reason);t.length>0&&(console.error("Errors during data fetch:",t),alert("Some data failed to load. Falling back to champion grouping.")),generatePreviewGroups("champion"),checkAndApplyBackground()}).catch(e=>{console.error("Unexpected error during data fetch:",e),alert("Failed to initialize data.")}),setTimeout(()=>{let e=new MutationObserver(()=>{uiVisible||checkAndCreateButton(),checkAndApplyBackground()}),t=document.querySelector('[data-screen-name="rcp-fe-lol-parties"]')||document.body;e.observe(t,{childList:!0,subtree:!0,attributes:!0,attributeFilter:["data-screen-name"]}),checkAndCreateButton(),checkAndApplyBackground()},1e3)}),document.head.insertAdjacentHTML("beforeend",`
+        `;
+        document.head.appendChild(styleElement);
+    }
+
+    const header = document.createElement('div');
+    header.className = 'header';
+
+    const title = document.createElement('h3');
+    title.textContent = 'BACKGROUND CUSTOMIZER';
+    header.appendChild(title);
+
+    const settingsButton = document.createElement('div');
+    settingsButton.className = 'lol-uikit-close-button';
+    settingsButton.setAttribute('button-type', 'cog');
+    const contents = document.createElement('div');
+    contents.className = 'contents';
+    const closeIcon = document.createElement('div');
+    closeIcon.className = 'close-icon';
+    contents.appendChild(closeIcon);
+    settingsButton.appendChild(contents);
+    settingsButton.addEventListener('click', () => {
+        if (settingsVisible) {
+            const settingsWrapper = document.getElementById('client-bg-settings-ui-wrapper');
+            if (settingsWrapper) settingsWrapper.remove();
+            settingsVisible = false;
+        } else {
+            createSettingsUI(container);
+            settingsVisible = true;
+            uiWrapper.style.display = 'none';
+        }
+    });
+    header.appendChild(settingsButton);
+
+    uiContainer.appendChild(header);
+
+    const searchBar = document.createElement('div');
+    searchBar.className = 'search-bar';
+
+    const searchInput = document.createElement('input');
+    searchInput.placeholder = 'Search';
+    searchInput.style.width = '40%';
+
+    const typeDropdown = document.createElement('div');
+    typeDropdown.className = 'custom-dropdown';
+    typeDropdown.style.width = '150px';
+
+    const typeToggle = document.createElement('div');
+    typeToggle.className = 'dropdown-toggle';
+    typeToggle.textContent = 'Champion';
+
+    const typeMenu = document.createElement('ul');
+    typeMenu.className = 'dropdown-menu';
+    let selectedType = 'champion';
+    const typeOptions = [
+        { label: 'Champion', value: 'champion' },
+        { label: 'Universes', value: 'universes' },
+        { label: 'Skinlines', value: 'skinlines' }
+    ];
+    typeOptions.forEach(option => {
+        const item = document.createElement('li');
+        item.className = 'dropdown-item';
+        item.textContent = option.label;
+        item.dataset.value = option.value;
+        if (option.value === 'champion') item.classList.add('selected');
+        item.addEventListener('click', () => {
+            typeToggle.textContent = option.label;
+            typeMenu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedType = option.value;
+            typeMenu.classList.remove('show');
+            console.log(`Selected type: ${selectedType}`);
+            generatePreviewGroups(selectedType);
+            renderSkins(previewGroups, currentSearchQuery);
+        });
+        typeMenu.appendChild(item);
+    });
+    typeToggle.addEventListener('click', () => {
+        const isOpen = typeMenu.classList.contains('show');
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+        if (!isOpen) {
+            typeMenu.classList.add('show');
+        }
+    });
+    typeDropdown.appendChild(typeToggle);
+    typeDropdown.appendChild(typeMenu);
+
+    const filterDropdown = document.createElement('div');
+    filterDropdown.className = 'custom-dropdown filter-dropdown';
+    filterDropdown.style.width = '120px';
+
+    const filterToggle = document.createElement('div');
+    filterToggle.className = 'dropdown-toggle';
+    filterToggle.textContent = isFavoritesToggled ? 'Favorites' : 'All Skins';
+
+    const filterMenu = document.createElement('ul');
+    filterMenu.className = 'dropdown-menu';
+    let selectedFilter = isFavoritesToggled ? 'favorites' : 'all';
+    const filterOptions = ['All Skins', 'Favorites'];
+    filterOptions.forEach(option => {
+        const item = document.createElement('li');
+        item.className = 'dropdown-item';
+        item.textContent = option;
+        item.dataset.value = option.toLowerCase().replace(' ', '');
+        if ((option === 'Favorites' && isFavoritesToggled) || (option === 'All Skins' && !isFavoritesToggled)) {
+            item.classList.add('selected');
+        }
+        item.addEventListener('click', () => {
+            filterToggle.textContent = option;
+            filterMenu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedFilter = item.dataset.value;
+            isFavoritesToggled = selectedFilter === 'favorites';
+            DataStore.set('favoritesToggled', isFavoritesToggled);
+            filterMenu.classList.remove('show');
+            renderSkins(previewGroups, currentSearchQuery, selectedFilter);
+        });
+        filterMenu.appendChild(item);
+    });
+    filterDropdown.appendChild(filterToggle);
+    filterDropdown.appendChild(filterMenu);
+
+    const sortDropdown = document.createElement('div');
+    sortDropdown.className = 'custom-dropdown';
+    sortDropdown.style.width = '150px';
+
+    const sortToggle = document.createElement('div');
+    sortToggle.className = 'dropdown-toggle';
+    sortToggle.textContent = 'Alphabetical▼';
+
+    const sortMenu = document.createElement('ul');
+    sortMenu.className = 'dropdown-menu';
+    let selectedSort = 'alphabetical';
+    const sortOptions = [
+        { label: 'Alphabetical▼', value: 'alphabetical' },
+        { label: 'Alphabetical▲', value: 'alphabetical-reverse' }
+    ];
+    sortOptions.forEach(option => {
+        const item = document.createElement('li');
+        item.className = 'dropdown-item';
+        item.textContent = option.label;
+        item.dataset.value = option.value;
+        if (option.value === 'alphabetical') item.classList.add('selected');
+        item.addEventListener('click', () => {
+            sortToggle.textContent = option.label;
+            sortMenu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedSort = option.value;
+            sortMenu.classList.remove('show');
+            renderSkins(previewGroups, currentSearchQuery, selectedFilter, selectedSort);
+        });
+        sortMenu.appendChild(item);
+    });
+    sortDropdown.appendChild(sortToggle);
+    sortDropdown.appendChild(sortMenu);
+
+    [filterToggle, sortToggle].forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            const menu = toggle.nextElementSibling;
+            const isOpen = menu.classList.contains('show');
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            if (!isOpen) {
+                menu.classList.add('show');
+            }
+        });
+    });
+
+    searchInput.addEventListener('input', () => {
+        currentSearchQuery = searchInput.value.toLowerCase().trim();
+        renderSkins(previewGroups, currentSearchQuery, selectedFilter, selectedSort);
+    });
+
+    searchBar.appendChild(searchInput);
+    searchBar.appendChild(typeDropdown);
+    searchBar.appendChild(filterDropdown);
+    searchBar.appendChild(sortDropdown);
+
+    uiContainer.appendChild(searchBar);
+
+    const mainWindow = document.createElement('div');
+    mainWindow.className = 'main-window';
+
+    function renderSkins(groups, searchQuery = '', filterOverride = 'all', sortOverride = 'alphabetical') {
+        const mainWindow = document.querySelector('.main-window');
+        if (!mainWindow) {
+            console.error('Main window not found');
+            return;
+        }
+
+        mainWindow.innerHTML = '';
+        let renderGroups = JSON.parse(JSON.stringify(groups));
+        let favoriteSkins = DataStore.get('favoriteSkins') || [];
+        const selectedFilter = filterOverride || document.querySelector('.filter-dropdown .dropdown-item.selected')?.dataset.value || 'all';
+        const selectedSort = sortOverride || document.querySelector('.sort-dropdown .dropdown-item.selected')?.dataset.value || 'alphabetical';
+
+        if (selectedFilter === 'favorites') {
+            if (favoriteSkins.length === 0) {
+                const noFavoritesMessage = document.createElement('div');
+                noFavoritesMessage.className = 'no-favorites-message';
+                noFavoritesMessage.textContent = 'No favorited skins';
+                mainWindow.appendChild(noFavoritesMessage);
+                return;
+            }
+            renderGroups = renderGroups
+                .map(group => ({
+                    title: group.title,
+                    items: group.items.filter(item => favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT))
+                }))
+                .filter(group => group.items.length > 0);
+        }
+
+        if (searchQuery) {
+            renderGroups = renderGroups
+                .map(group => ({
+                    title: group.title,
+                    items: group.items.filter(item => 
+                        item.name.toLowerCase().includes(searchQuery) || 
+                        group.title.toLowerCase().includes(searchQuery)
+                    )
+                }))
+                .filter(group => group.items.length > 0 || group.title.toLowerCase().includes(searchQuery));
+        }
+
+        if (selectedSort === 'alphabetical') {
+            renderGroups.sort((a, b) => a.title.localeCompare(b.title));
+            renderGroups.forEach(group => {
+                group.items.sort((a, b) => a.name.localeCompare(b.name));
+            });
+        } else {
+            renderGroups.sort((a, b) => b.title.localeCompare(a.title));
+            renderGroups.forEach(group => {
+                group.items.sort((a, b) => b.name.localeCompare(a.name));
+            });
+        }
+
+        if (renderGroups.length === 0 && !searchQuery && selectedFilter !== 'favorites') {
+            console.warn('No groups to render, regenerating with champion grouping');
+            generatePreviewGroups('champion');
+            renderGroups = previewGroups;
+        }
+
+        renderGroups.forEach(group => {
+            const groupTitle = document.createElement('div');
+            groupTitle.className = 'skin-group-title';
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = group.title;
+            groupTitle.appendChild(titleSpan);
+            groupTitle.dataset.groupTitle = group.title;
+
+            const groupFavoriteButton = document.createElement('button');
+            groupFavoriteButton.className = 'group-favorite-button';
+            const allFavorited = group.items.every(item => favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT));
+            if (allFavorited) {
+                groupFavoriteButton.classList.add('favorited');
+            }
+            groupFavoriteButton.addEventListener('click', () => {
+                const isAllFavorited = group.items.every(item => favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT));
+                if (isAllFavorited) {
+                    favoriteSkins = favoriteSkins.filter(fav => !group.items.some(item => item.name === fav.name && item.isTFT === item.isTFT));
+                    groupFavoriteButton.classList.remove('favorited');
+                    const skinButtons = groupTitle.nextElementSibling.querySelectorAll('.favorite-button');
+                    skinButtons.forEach(btn => btn.classList.remove('favorited'));
+                } else {
+                    group.items.forEach(item => {
+                        if (!favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT)) {
+                            favoriteSkins.push({
+                                name: item.name,
+                                tilePath: item.tilePath,
+                                splashPath: item.splashPath,
+                                uncenteredSplashPath: item.uncenteredSplashPath,
+                                skinLineId: item.skinLineId,
+                                skinLineName: item.skinLineName,
+                                isTFT: item.isTFT
+                            });
+                        }
+                    });
+                    groupFavoriteButton.classList.add('favorited');
+                    const skinButtons = groupTitle.nextElementSibling.querySelectorAll('.favorite-button');
+                    skinButtons.forEach(btn => btn.classList.add('favorited'));
+                }
+                DataStore.set('favoriteSkins', favoriteSkins);
+                renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+            });
+            groupTitle.appendChild(groupFavoriteButton);
+            mainWindow.appendChild(groupTitle);
+
+            const skinGroup = document.createElement('div');
+            skinGroup.className = 'skin-group';
+            group.items.forEach(item => {
+                const skinContainer = document.createElement('div');
+                skinContainer.className = 'skin-container';
+                skinContainer.style.position = 'relative';
+
+                const skinImage = document.createElement('div');
+                skinImage.className = 'skin-image';
+                skinImage.dataset.tilePath = item.tilePath || '';
+                skinImage.dataset.name = item.name;
+                skinImage.dataset.splashPath = item.splashPath;
+                skinImage.dataset.uncenteredSplashPath = item.uncenteredSplashPath;
+                skinImage.dataset.skinLineId = item.skinLineId || '';
+                skinImage.dataset.skinLineName = item.skinLineName || '';
+                skinImage.dataset.isTFT = item.isTFT ? 'true' : 'false';
+                skinImage.style.position = 'relative';
+                skinImage.style.boxSizing = 'border-box';
+
+                const handleImageError = () => {
+                    console.log(`Image failed to load for ${item.name}: ${item.tilePath}`);
+                    skinImage.className = 'skin-image failed';
+                    skinImage.style.backgroundImage = 'none';
+                    const failedText = document.createElement('div');
+                    failedText.className = 'failed-text';
+                    failedText.textContent = 'Failed to Load Preview';
+                    skinImage.appendChild(failedText);
+                };
+
+                if (item.tilePath) {
+                    skinImage.style.backgroundImage = `url(${item.tilePath})`;
+                    const img = new Image();
+                    img.src = item.tilePath;
+                    img.onerror = handleImageError;
+                } else {
+                    handleImageError();
+                }
+
+                if (savedSkin && savedSkin.name.trim().toLowerCase() === item.name.trim().toLowerCase() && savedSkin.isTFT === item.isTFT) {
+                    skinImage.classList.add('selected');
+                }
+                skinImage.addEventListener('click', () => {
+                    document.querySelectorAll('.skin-image').forEach(img => img.classList.remove('selected'));
+                    skinImage.classList.add('selected');
+                    const selectedSkin = {
+                        name: item.name,
+                        tilePath: item.tilePath,
+                        splashPath: item.splashPath,
+                        uncenteredSplashPath: item.uncenteredSplashPath,
+                        skinLineId: item.skinLineId,
+                        skinLineName: item.skinLineName,
+                        isTFT: item.isTFT
+                    };
+                    DataStore.set('selectedSkin', selectedSkin);
+                    applyBackground(selectedSkin);
+                });
+                const skinFavoriteButton = document.createElement('button');
+                skinFavoriteButton.className = 'favorite-button';
+                if (favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT)) {
+                    skinFavoriteButton.classList.add('favorited');
+                }
+                skinFavoriteButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isFavorited = favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT);
+                    if (isFavorited) {
+                        favoriteSkins = favoriteSkins.filter(fav => !(fav.name === item.name && fav.isTFT === item.isTFT));
+                        skinFavoriteButton.classList.remove('favorited');
+                    } else {
+                        favoriteSkins.push({
+                            name: item.name,
+                            tilePath: item.tilePath,
+                            splashPath: item.splashPath,
+                            uncenteredSplashPath: item.uncenteredSplashPath,
+                            skinLineId: item.skinLineId,
+                            skinLineName: item.skinLineName,
+                            isTFT: item.isTFT
+                        });
+                        skinFavoriteButton.classList.add('favorited');
+                    }
+                    DataStore.set('favoriteSkins', favoriteSkins);
+                    window.favoriteSkins = favoriteSkins;
+                    const groupFavButton = skinContainer.closest('.skin-group').previousElementSibling.querySelector('.group-favorite-button');
+                    const allFavorited = group.items.every(it => favoriteSkins.some(fav => fav.name === it.name && fav.isTFT === it.isTFT));
+                    groupFavButton.classList.toggle('favorited', allFavorited);
+                    renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+                });
+                skinImage.appendChild(skinFavoriteButton);
+                skinContainer.appendChild(skinImage);
+
+                const label = document.createElement('div');
+                label.className = 'skin-label';
+                label.textContent = item.name;
+                skinContainer.appendChild(label);
+
+                skinGroup.appendChild(skinContainer);
+            });
+            mainWindow.appendChild(skinGroup);
+        });
+
+        if (savedSkin && savedSkin.name && isInitialLoad) {
+            setTimeout(() => {
+                const escapedName = CSS.escape(savedSkin.name);
+                const selector = `.skin-image[data-name="${escapedName}"][data-is-tft="${savedSkin.isTFT}"]`;
+                const selectedImage = mainWindow.querySelector(selector);
+                if (selectedImage) {
+                    selectedImage.classList.add('selected');
+                    selectedImage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 200);
+            isInitialLoad = false;
+        }
+
+        window.addMorePreviews = (newGroups) => {
+            previewGroups.push(...newGroups);
+            renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+        };
+    }
+
+    uiContainer.appendChild(mainWindow);
+
+    const bottomBar = document.createElement('div');
+    bottomBar.className = 'bottom-bar';
+
+    const resetFavoritesBtn = document.createElement('button');
+    resetFavoritesBtn.textContent = 'RESET FAVORITES';
+    resetFavoritesBtn.addEventListener('click', () => {
+        favoriteSkins = [];
+        DataStore.set('favoriteSkins', favoriteSkins);
+        document.querySelectorAll('.favorite-button').forEach(btn => btn.classList.remove('favorited'));
+        document.querySelectorAll('.group-favorite-button').forEach(btn => btn.classList.remove('favorited'));
+        renderSkins(previewGroups, currentSearchQuery, selectedFilter, selectedSort);
+    });
+    bottomBar.appendChild(resetFavoritesBtn);
+
+    const favoritesToggleBtn = document.createElement('button');
+    favoritesToggleBtn.className = 'favorites-toggle';
+    if (isFavoritesToggled) {
+        favoritesToggleBtn.classList.add('toggled');
+    }
+    const toggleContainer = document.createElement('div');
+    toggleContainer.className = 'toggle-container';
+    const toggledDiv = document.createElement('div');
+    toggledDiv.className = 'toggled';
+    if (isFavoritesToggled) {
+        toggledDiv.classList.add('toggled-on');
+    }
+    const toggleButton = document.createElement('div');
+    toggleButton.className = 'toggle-button';
+    toggleContainer.appendChild(toggledDiv);
+    toggleContainer.appendChild(toggleButton);
+    favoritesToggleBtn.appendChild(toggleContainer);
+    favoritesToggleBtn.addEventListener('click', () => {
+        isFavoritesToggled = !isFavoritesToggled;
+        DataStore.set('favoritesToggled', isFavoritesToggled);
+        favoritesToggleBtn.classList.toggle('toggled', isFavoritesToggled);
+        toggledDiv.classList.toggle('toggled-on', isFavoritesToggled);
+        filterToggle.textContent = isFavoritesToggled ? 'Favorites' : 'All Skins';
+        filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.classList.toggle('selected', item.textContent === (isFavoritesToggled ? 'Favorites' : 'All Skins'));
+        });
+        selectedFilter = isFavoritesToggled ? 'favorites' : 'all';
+        renderSkins(previewGroups, currentSearchQuery, selectedFilter, selectedSort);
+    });
+    bottomBar.appendChild(favoritesToggleBtn);
+
+    const randomizeBtn = document.createElement('button');
+    randomizeBtn.className = 'randomize-button';
+    randomizeBtn.textContent = 'Shuffle';
+    randomizeBtn.addEventListener('click', () => {
+        let allItems = [];
+        if (isFavoritesToggled && favoriteSkins.length > 0) {
+            allItems = favoriteSkins;
+        } else {
+            allItems = previewGroups.flatMap(group => group.items);
+        }
+        if (allItems.length === 0) {
+            console.log('No items available to randomize');
+            return;
+        }
+        const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+        DataStore.set('selectedSkin', {
+            name: randomItem.name,
+            tilePath: randomItem.tilePath,
+            splashPath: randomItem.splashPath,
+            uncenteredSplashPath: randomItem.uncenteredSplashPath,
+            skinLineId: randomItem.skinLineId,
+            skinLineName: randomItem.skinLineName,
+            isTFT: randomItem.isTFT
+        });
+        document.querySelectorAll('.skin-image').forEach(img => img.classList.remove('selected'));
+        const selector = `.skin-image[data-name="${CSS.escape(randomItem.name)}"][data-is-tft="${randomItem.isTFT}"]`;
+        const selectedImage = mainWindow.querySelector(selector);
+        if (selectedImage) {
+            selectedImage.classList.add('selected');
+            selectedImage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        applyBackground(randomItem);
+        if (cycleShuffleEnabled) {
+            startShuffleCycle(favoriteSkins, isFavoritesToggled);
+            uiWrapper.remove();
+            backdrop.remove();
+            uiVisible = false;
+            checkAndCreateButton();
+        }
+    });
+    bottomBar.appendChild(randomizeBtn);
+
+    const profilesBtn = document.createElement('button');
+    profilesBtn.textContent = 'PROFILES';
+    profilesBtn.addEventListener('click', () => {
+        if (shuffleCycleIntervalId) {
+            clearInterval(shuffleCycleIntervalId);
+            shuffleCycleIntervalId = null;
+            console.log('Stopped shuffle cycle for profiles UI');
+        }
+        createProfilesUI(container);
+    });
+    bottomBar.appendChild(profilesBtn);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.addEventListener('click', () => {
+        const selectedImage = mainWindow.querySelector('.skin-image.selected');
+        if (selectedImage) {
+            const item = {
+                name: selectedImage.dataset.name,
+                tilePath: selectedImage.dataset.tilePath,
+                splashPath: selectedImage.dataset.splashPath,
+                uncenteredSplashPath: selectedImage.dataset.uncenteredSplashPath,
+                skinLineId: selectedImage.dataset.skinLineId,
+                skinLineName: selectedImage.dataset.skinLineName,
+                isTFT: selectedImage.dataset.isTFT === 'true'
+            };
+            DataStore.set('selectedSkin', item);
+            applyBackground(item);
+        }
+        uiWrapper.remove();
+        backdrop.remove();
+        uiVisible = false;
+        checkAndCreateButton();
+    });
+    bottomBar.appendChild(confirmBtn);
+
+    uiContainer.appendChild(bottomBar);
+    uiWrapper.appendChild(uiContainer);
+
+    if (shuffleCycleIntervalId) {
+        clearInterval(shuffleCycleIntervalId);
+        shuffleCycleIntervalId = null;
+        console.log('Stopped existing shuffle cycle');
+    }
+
+    container.appendChild(backdrop);
+    container.appendChild(uiWrapper);
+
+    generatePreviewGroups('champion');
+    renderSkins(previewGroups, currentSearchQuery, selectedFilter, selectedSort);
+}
+
+document.head.insertAdjacentHTML('beforeend', `
   <style>
     .lol-uikit-background-switcher-image {
       display: none !important;
