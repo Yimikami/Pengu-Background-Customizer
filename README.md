@@ -6,8 +6,7 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 
 | Main UI | Settings | Profiles |
 |--------|----------|----------|
-| ![Main UI](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(2).png) | ![Settings](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(4).png) | ![Profiles](https://github.com/ErisuGreyrat/Private-Images/blob/main/CustomBackgroundPreview%20(3).png) |
-
+| [![Main UI](preview/main-ui.png)](preview/main-ui.png){: width="400" } | [![Settings](preview/settings.png)](preview/settings.png){: width="400" } | [![Profiles](preview/profiles.png)](preview/profiles.png){: width="400" } |
 ## Features
 
 - Set backgrounds from champion skins, universes, skinlines, or TFT companions.
