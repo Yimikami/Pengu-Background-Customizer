@@ -414,8 +414,8 @@ function createShowButton(container) {
     hoverArea.style.cssText = `
         position: absolute;
         top: 40%;
-        left: 0;
-        width: 60px;
+        left: -70px;
+        width: 250px;
         height: 20%;
         z-index: 9998;
         display: flex;
@@ -428,12 +428,14 @@ function createShowButton(container) {
     showButton.id = 'client-bg-show-button';
     showButton.className = 'lol-custom-ui';
     showButton.style.cssText = `
-        padding: 8px 12px;
+        padding: 8px 16px;
         z-index: 9999;
         background: #010a13;
         border: 1px solid #785a28;
         color: #cdbe91;
         border-radius: 2px;
+        font-size: 24px;
+        font-weight: bold;
         font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
         transition: all 0.2s, opacity 0.3s;
         opacity: 0;
