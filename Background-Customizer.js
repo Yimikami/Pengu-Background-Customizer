@@ -255,9 +255,13 @@ function checkAndApplyBackground() {
 
     const partiesScreen = document.querySelector('[data-screen-name="rcp-fe-lol-parties"]');
     const activityCenterScreen = document.querySelector('.screen-root.active[data-screen-name="rcp-fe-lol-activity-center"]');
+    const postgameScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-postgame"]');
+    const profilesMainScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-profiles-main"]');
     const savedItem = DataStore.get('selectedSkin');
 
-    if (activityCenterScreen && getComputedStyle(activityCenterScreen).opacity === '1') {
+    if ((activityCenterScreen && getComputedStyle(activityCenterScreen).opacity === '1') || 
+        (postgameScreen && getComputedStyle(postgameScreen).opacity === '1') || 
+        (profilesMainScreen && getComputedStyle(profilesMainScreen).opacity === '1')) {
         currentOpacity = 0;
     } else {
         currentOpacity = storedOpacity;
@@ -289,10 +293,49 @@ function setupActivityCenterObserver() {
     console.log('Activity center observer set up');
 }
 
+function setupProfilesMainObserver() {
+    const profilesMainScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-profiles-main"]');
+    if (!profilesMainScreen) {
+        console.log('Profiles main screen not found for observer setup');
+        return;
+    }
+
+    const observer = new MutationObserver(() => {
+        checkAndApplyBackground();
+    });
+
+    observer.observe(profilesMainScreen, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+
+    console.log('Profiles main screen observer set up');
+}
+
+function setupPostgameObserver() {
+    const postgameScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-postgame"]');
+    if (!postgameScreen) {
+        console.log('Postgame screen not found for observer setup');
+        return;
+    }
+
+    const observer = new MutationObserver(() => {
+        checkAndApplyBackground();
+    });
+
+    observer.observe(postgameScreen, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+
+    console.log('Postgame screen observer set up');
+}
 
 window.addEventListener('load', () => {
     console.log('Pengu Loader Client Background Customizer plugin loading...');
     setupActivityCenterObserver();
+    setupProfilesMainObserver();
+    setupPostgameObserver();
     loadSavedSettings();
 
     Promise.allSettled([
