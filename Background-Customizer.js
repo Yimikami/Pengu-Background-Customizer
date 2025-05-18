@@ -3054,8 +3054,8 @@ function createClientBackgroundCustomizerUI(container) {
 
 document.head.insertAdjacentHTML('beforeend', `
   <style>
-    .lol-uikit-background-switcher-image {
-      display: none !important;
+    .parties-view .parties-background .uikit-background-switcher {
+      opacity: 0 !important;
     }
   </style>
 `);
