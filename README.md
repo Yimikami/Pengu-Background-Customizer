@@ -24,7 +24,7 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
    ```bash
    git clone https://github.com/ErisuGreyrat/pengu-background-customizer.git
    ```
-   Place it in your Pengu Loader plugins folder (e.g., `C:\Users\YourName\AppData\Local\Pengu Loader\plugins\`).
+   Place Background-Customizer.js in your Pengu Loader plugins folder (e.g., `C:\Users\YourName\AppData\Local\Pengu Loader\plugins\`).
 3. Optionally, install the [Acrylic League Theme](https://github.com/ErisuGreyrat/acrylic-league-theme):
    ```bash
    git clone https://github.com/ErisuGreyrat/acrylic-league-theme.git
