@@ -109,6 +109,20 @@ function preloadImage(url) {
     });
 }
 
+function preloadVideo(url) {
+    return new Promise((resolve) => {
+        if (!url) return resolve();
+        const video = document.createElement('video');
+        video.src = url;
+        video.preload = 'auto';
+        video.onloadeddata = resolve;
+        video.onerror = () => {
+            console.warn(`Failed to preload video: ${url}`);
+            resolve();
+        };
+    });
+}
+
 async function applyBackground(item) {
     const viewport = document.getElementById('rcp-fe-viewport-root');
     if (!viewport || !item || !backgroundEnabled) {
@@ -134,7 +148,13 @@ async function applyBackground(item) {
         return;
     }
 
-    await preloadImage(splashUrl);
+    // Preload based on file type
+    const isVideo = splashUrl.toLowerCase().endsWith('.webm');
+    if (isVideo) {
+        await preloadVideo(splashUrl);
+    } else {
+        await preloadImage(splashUrl);
+    }
 
     let bgContainer = document.getElementById('client-bg-container');
     if (!bgContainer) {
@@ -157,26 +177,58 @@ async function applyBackground(item) {
         existingLayers.forEach((layer, index) => {
             if (index < existingLayers.length - 1) {
                 layer.remove();
-                console.log(`Removed excess layer: ${layer.style.backgroundImage}`);
+                console.log(`Removed excess layer: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`);
             }
         });
     }
 
-    const newBg = document.createElement('div');
-    newBg.className = 'client-bg-layer';
-    newBg.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: url('${splashUrl}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        opacity: 0;
-        transition: opacity ${transitionDuration}s ease;
-    `;
+    let newBg;
+    if (isVideo) {
+        newBg = document.createElement('video');
+        newBg.className = 'client-bg-layer';
+        newBg.src = splashUrl;
+        newBg.loop = true;
+        newBg.muted = true;
+        newBg.autoplay = true;
+        newBg.playsInline = true;
+        newBg.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            opacity: 0;
+            transition: opacity ${transitionDuration}s ease;
+        `;
+        // Ensure video loads
+        newBg.onloadeddata = () => {
+            console.log(`Video loaded successfully: ${splashUrl}`);
+            newBg.style.opacity = currentOpacity;
+        };
+        newBg.onerror = () => {
+            console.error(`Failed to load video: ${splashUrl}`);
+            newBg.remove();
+            removeBackground();
+        };
+    } else {
+        newBg = document.createElement('div');
+        newBg.className = 'client-bg-layer';
+        newBg.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('${splashUrl}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transition: opacity ${transitionDuration}s ease;
+        `;
+    }
 
     bgContainer.appendChild(newBg);
 
@@ -201,24 +253,33 @@ async function applyBackground(item) {
             background-repeat: no-repeat;
             transition: opacity ${transitionDuration}s ease;
         }
+        .client-bg-layer video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+        }
     `;
 
-    newBg.offsetHeight;
+    newBg.offsetHeight; // Force reflow
 
-    newBg.style.opacity = currentOpacity;
+    if (!isVideo) {
+        newBg.style.opacity = currentOpacity;
+    }
+
     const oldBg = bgContainer.querySelector('.client-bg-layer:not(:last-child)');
     if (oldBg) {
         oldBg.style.opacity = 0;
         setTimeout(() => {
             if (oldBg.parentNode) {
                 oldBg.remove();
-                console.log(`Cleaned up old layer: ${oldBg.style.backgroundImage}`);
+                console.log(`Cleaned up old layer: ${oldBg.tagName === 'VIDEO' ? oldBg.src : oldBg.style.backgroundImage}`);
             }
         }, transitionDuration * 1000 + 100);
     }
 
     lastAppliedUrl = splashUrl;
-    console.log(`Background applied: ${item.name}, URL: ${splashUrl}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`);
+    console.log(`Background applied: ${item.name}, URL: ${splashUrl}, Type: ${isVideo ? 'video' : 'image'}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`);
 }
 
 function removeBackground() {
@@ -232,7 +293,7 @@ function removeBackground() {
                 setTimeout(() => {
                     if (layer.parentNode) {
                         layer.remove();
-                        console.log(`Removed layer during reset: ${layer.style.backgroundImage}`);
+                        console.log(`Removed layer during reset: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`);
                     }
                 }, transitionDuration * 1000 + 100);
             });
@@ -345,16 +406,70 @@ window.addEventListener('load', () => {
                 return response.json();
             })
             .then(data => {
-                skinData = Object.values(data).map(skin => {
-                    const cleanTilePath = skin.tilePath ? skin.tilePath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
-                    const cleanSplashPath = skin.splashPath ? skin.splashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
-                    const cleanUncenteredSplashPath = skin.uncenteredSplashPath ? skin.uncenteredSplashPath.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
-                    return {
+                skinData = Object.values(data).flatMap(skin => {
+                    const cleanPath = (path) => path ? path.replace(/^\/lol-game-data\/assets\/ASSETS\//i, '').toLowerCase() : '';
+                    const baseSkin = {
                         ...skin,
-                        tilePath: cleanTilePath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanTilePath}` : '',
-                        splashPath: cleanSplashPath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanSplashPath}` : '',
-                        uncenteredSplashPath: cleanUncenteredSplashPath ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanUncenteredSplashPath}` : ''
+                        tilePath: cleanPath(skin.tilePath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.tilePath)}` : '',
+                        splashPath: cleanPath(skin.splashPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.splashPath)}` : '',
+                        uncenteredSplashPath: cleanPath(skin.uncenteredSplashPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.uncenteredSplashPath)}` : '',
+                        splashVideoPath: cleanPath(skin.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.splashVideoPath)}` : '',
+                        collectionSplashVideoPath: cleanPath(skin.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.collectionSplashVideoPath)}` : ''
                     };
+                    const skins = [baseSkin];
+
+                    // Add animated version if video paths exist
+                    if (skin.splashVideoPath || skin.collectionSplashVideoPath) {
+                        skins.push({
+                            ...skin,
+                            id: `${skin.id}-animated`,
+                            name: `${skin.name} Animated`,
+                            tilePath: cleanPath(skin.tilePath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.tilePath)}` : '',
+                            splashPath: cleanPath(skin.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.splashVideoPath)}` : '',
+                            uncenteredSplashPath: cleanPath(skin.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.collectionSplashVideoPath)}` : '',
+                            splashVideoPath: cleanPath(skin.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.splashVideoPath)}` : '',
+                            collectionSplashVideoPath: cleanPath(skin.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(skin.collectionSplashVideoPath)}` : '',
+                            isAnimated: true
+                        });
+                    }
+
+                    // Handle quest skin tiers, skipping the first tier
+                    if (skin.questSkinInfo && skin.questSkinInfo.tiers) {
+                        skin.questSkinInfo.tiers.forEach((tier, index) => {
+                            if (index === 0) return; // Skip the first tier to avoid duplicate with base skin
+                            if (tier.tilePath && tier.splashPath) {
+                                const tierSkin = {
+                                    ...skin,
+                                    id: tier.id || `${skin.id}-${tier.stage}`,
+                                    name: tier.name || `${skin.name} Stage ${tier.stage}`,
+                                    tilePath: cleanPath(tier.tilePath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.tilePath)}` : '',
+                                    splashPath: cleanPath(tier.splashPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.splashPath)}` : '',
+                                    uncenteredSplashPath: cleanPath(tier.uncenteredSplashPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.uncenteredSplashPath)}` : '',
+                                    splashVideoPath: cleanPath(tier.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.splashVideoPath)}` : '',
+                                    collectionSplashVideoPath: cleanPath(tier.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.collectionSplashVideoPath)}` : '',
+                                    stage: tier.stage
+                                };
+                                skins.push(tierSkin);
+
+                                // Add animated version for tier if video paths exist
+                                if (tier.splashVideoPath || tier.collectionSplashVideoPath) {
+                                    skins.push({
+                                        ...skin,
+                                        id: tier.id ? `${tier.id}-animated` : `${skin.id}-${tier.stage}-animated`,
+                                        name: tier.name ? `${tier.name} Animated` : `${skin.name} Stage ${tier.stage} Animated`,
+                                        tilePath: cleanPath(tier.tilePath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.tilePath)}` : '',
+                                        splashPath: cleanPath(tier.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.splashVideoPath)}` : '',
+                                        uncenteredSplashPath: cleanPath(tier.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.collectionSplashVideoPath)}` : '',
+                                        splashVideoPath: cleanPath(tier.splashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.splashVideoPath)}` : '',
+                                        collectionSplashVideoPath: cleanPath(tier.collectionSplashVideoPath) ? `https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/${cleanPath(tier.collectionSplashVideoPath)}` : '',
+                                        stage: tier.stage,
+                                        isAnimated: true
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    return skins;
                 });
                 console.log('Fetched skins.json, skinData length:', skinData.length);
             }),
