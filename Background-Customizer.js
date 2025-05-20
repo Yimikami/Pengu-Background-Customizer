@@ -27,8 +27,7 @@ let skinProfiles = [];
 let activeProfile = null;
 let isInitialLoad = true;
 let customBackgrounds = [];
-
-const DEBUG = false;
+let DEBUG = false;
 
 
 function isDataStoreAvailable() {
@@ -49,6 +48,7 @@ function saveSettings() {
             skinProfiles,
             activeProfile,
             customBackgrounds,
+            debug: DEBUG,
             savedAt: new Date().toISOString()
         };
         if (isDataStoreAvailable()) {
@@ -78,6 +78,7 @@ function loadSavedSettings() {
                 skinProfiles = config.skinProfiles !== undefined ? config.skinProfiles : [];
                 activeProfile = config.activeProfile !== undefined ? config.activeProfile : null;
                 customBackgrounds = config.customBackgrounds !== undefined ? config.customBackgrounds : [];
+                DEBUG = config.debug !== undefined ? config.debug : false;
                 console.log('Loaded settings:', { 
                     backgroundEnabled, 
                     currentOpacity: storedOpacity, 
@@ -89,6 +90,7 @@ function loadSavedSettings() {
                     skinProfiles,
                     activeProfile,
                     customBackgrounds,
+                    debug: DEBUG,
                     savedAt: config.savedAt 
                 });
                 return true;
@@ -336,8 +338,10 @@ function checkAndApplyBackground() {
 
     if (backgroundEnabled && savedItem && (partiesScreen || persistBackground)) {
         applyBackground(savedItem);
+        updatePlaceholderInvitedContainer();
     } else {
         removeBackground();
+        updatePlaceholderInvitedContainer();
     }
 }
 
@@ -398,11 +402,100 @@ function setupPostgameObserver() {
     if (DEBUG) { console.log('Postgame screen observer set up'); }
 }
 
+function updatePlaceholderInvitedContainer() {
+  if (!backgroundEnabled) {
+    // If background is disabled, ensure placeholder container is visible
+    const placeholderContainers = document.querySelectorAll(
+      ".placeholder-invited-container"
+    );
+    placeholderContainers.forEach((container) => {
+      if (
+        container.querySelector(
+          'video[src*="/fe/lol-parties/parties-v2/invited-banner.webm"]'
+        )
+      ) {
+        container.style.display = "";
+        if (DEBUG) {
+          debugLog("Restored placeholder invited container visibility");
+        }
+      }
+    });
+    return;
+  }
+
+  // If background is enabled, hide placeholder container
+  const placeholderContainers = document.querySelectorAll(
+    ".placeholder-invited-container"
+  );
+  placeholderContainers.forEach((container) => {
+    if (
+      container.querySelector(
+        'video[src*="/fe/lol-parties/parties-v2/invited-banner.webm"]'
+      )
+    ) {
+      container.style.display = "none";
+      if (DEBUG) {
+        debugLog("Hidden placeholder invited container");
+      }
+    }
+  });
+}
+
+function setupPlaceholderContainerObserver() {
+  const partiesScreen = document.querySelector(
+    '[data-screen-name="rcp-fe-lol-parties"]'
+  );
+  if (!partiesScreen) {
+    if (DEBUG) {
+      debugLog(
+        "Parties screen not found for placeholder container observer setup"
+      );
+    }
+    return;
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        const placeholderAdded = Array.from(mutation.addedNodes).some(
+          (node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              return (
+                node.classList?.contains("placeholder-invited-container") ||
+                node.querySelector?.(".placeholder-invited-container")
+              );
+            }
+            return false;
+          }
+        );
+
+        if (placeholderAdded) {
+          if (DEBUG) {
+            debugLog("Placeholder invited container added to DOM");
+          }
+          updatePlaceholderInvitedContainer();
+          break;
+        }
+      }
+    }
+  });
+
+  observer.observe(partiesScreen, {
+    childList: true,
+    subtree: true,
+  });
+
+  if (DEBUG) {
+    debugLog("Placeholder container observer set up");
+  }
+}
+
 window.addEventListener('load', () => {
     if (DEBUG) { console.log('Pengu Loader Client Background Customizer plugin loading...'); }
     setupActivityCenterObserver();
     setupProfilesMainObserver();
     setupPostgameObserver();
+    updatePlaceholderInvitedContainer();
     loadSavedSettings();
 
     Promise.allSettled([
@@ -1859,7 +1952,7 @@ function createSettingsUI(container) {
     opacitySlider.min = '0.1';
     opacitySlider.max = '1';
     opacitySlider.step = '0.1';
-    opacitySlider.value = storedOpacity; // Use storedOpacity
+    opacitySlider.value = storedOpacity;
     opacitySlider.style.cssText = `
         flex: 1;
         height: 8px;
@@ -1890,9 +1983,9 @@ function createSettingsUI(container) {
         const step = 0.1;
         const newValue = Math.max(parseFloat(opacitySlider.min), Math.round((parseFloat(opacitySlider.value) - step) * 10) / 10);
         opacitySlider.value = newValue;
-        storedOpacity = newValue; // Update storedOpacity
+        storedOpacity = newValue;
         opacityValue.textContent = newValue.toString();
-        currentOpacity = storedOpacity; // Sync currentOpacity
+        currentOpacity = storedOpacity;
         saveSettings();
         checkAndApplyBackground();
     });
@@ -1914,16 +2007,16 @@ function createSettingsUI(container) {
         const step = 0.1;
         const newValue = Math.min(parseFloat(opacitySlider.max), Math.round((parseFloat(opacitySlider.value) + step) * 10) / 10);
         opacitySlider.value = newValue;
-        storedOpacity = newValue; // Update storedOpacity
+        storedOpacity = newValue;
         opacityValue.textContent = newValue.toString();
-        currentOpacity = storedOpacity; // Sync currentOpacity
+        currentOpacity = storedOpacity;
         saveSettings();
         checkAndApplyBackground();
     });
     opacitySlider.addEventListener('input', () => {
-        storedOpacity = parseFloat(opacitySlider.value); // Update storedOpacity
+        storedOpacity = parseFloat(opacitySlider.value);
         opacityValue.textContent = storedOpacity.toString();
-        currentOpacity = storedOpacity; // Sync currentOpacity
+        currentOpacity = storedOpacity;
         saveSettings();
         checkAndApplyBackground();
     });
@@ -2244,6 +2337,50 @@ function createSettingsUI(container) {
     transitionDurationSlider.addEventListener('input', () => {
         transitionDuration = parseFloat(transitionDurationSlider.value);
         transitionDurationValue.textContent = transitionDuration.toString();
+        saveSettings();
+    });
+
+    // New Debug Section
+    const debugSettingsTitle = document.createElement('h4');
+    debugSettingsTitle.textContent = 'Debug';
+    debugSettingsTitle.style.cssText = `
+        color: #f0e6d2;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 10px 0 5px 0;
+        text-transform: uppercase;
+    `;
+    settingsContent.appendChild(debugSettingsTitle);
+
+    const debugSeparator = document.createElement('hr');
+    debugSeparator.style.cssText = `
+        border: 0;
+        border-top: 1px solid #785a28;
+        margin: 10px 0;
+    `;
+    settingsContent.appendChild(debugSeparator);
+
+    const debugContainer = document.createElement('div');
+    debugContainer.className = 'toggle-btn';
+    debugContainer.style.cssText = `margin-bottom: 15px;`;
+    const debugLabel = document.createElement('span');
+    debugLabel.textContent = 'Enable Debug Mode:';
+    const debugSwitch = document.createElement('label');
+    debugSwitch.className = 'toggle-switch';
+    const debugInput = document.createElement('input');
+    debugInput.type = 'checkbox';
+    debugInput.checked = DEBUG;
+    const debugSlider = document.createElement('span');
+    debugSlider.className = 'toggle-slider';
+    debugSwitch.appendChild(debugInput);
+    debugSwitch.appendChild(debugSlider);
+    debugContainer.appendChild(debugLabel);
+    debugContainer.appendChild(debugSwitch);
+    settingsContent.appendChild(debugContainer);
+
+    debugInput.addEventListener('change', () => {
+        DEBUG = debugInput.checked;
+        if (DEBUG) { console.log('Debug mode toggled:', DEBUG); }
         saveSettings();
     });
 
@@ -3750,6 +3887,10 @@ document.head.insertAdjacentHTML('beforeend', `
   <style>
     .parties-view .parties-background .uikit-background-switcher {
       opacity: 0 !important;
+    }
+    /* Hide the entire placeholder invited container when background is enabled */
+    .custom-background .placeholder-invited-container {
+      display: none !important;
     }
   </style>
 `);
