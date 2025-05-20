@@ -26,6 +26,9 @@ let lastAppliedUrl = null;
 let skinProfiles = [];
 let activeProfile = null;
 let isInitialLoad = true;
+let customBackgrounds = [];
+
+const DEBUG = false;
 
 
 function isDataStoreAvailable() {
@@ -45,16 +48,17 @@ function saveSettings() {
             transitionDuration,
             skinProfiles,
             activeProfile,
+            customBackgrounds,
             savedAt: new Date().toISOString()
         };
         if (isDataStoreAvailable()) {
             DataStore.set('dynamicBg_config', configData);
-            console.log('Settings saved:', configData);
+            if (DEBUG) { console.log('Settings saved:', configData); }
         } else {
-            console.error('DataStore API not available');
+            if (DEBUG) { console.error('DataStore API not available'); }
         }
     } catch (error) {
-        console.error('Failed to save settings:', error);
+        if (DEBUG) { console.error('Failed to save settings:', error); }
     }
 }
 
@@ -73,6 +77,7 @@ function loadSavedSettings() {
                 transitionDuration = config.transitionDuration !== undefined ? parseFloat(config.transitionDuration) : 0.5;
                 skinProfiles = config.skinProfiles !== undefined ? config.skinProfiles : [];
                 activeProfile = config.activeProfile !== undefined ? config.activeProfile : null;
+                customBackgrounds = config.customBackgrounds !== undefined ? config.customBackgrounds : [];
                 console.log('Loaded settings:', { 
                     backgroundEnabled, 
                     currentOpacity: storedOpacity, 
@@ -83,15 +88,16 @@ function loadSavedSettings() {
                     transitionDuration,
                     skinProfiles,
                     activeProfile,
+                    customBackgrounds,
                     savedAt: config.savedAt 
                 });
                 return true;
             }
         }
-        console.log('No saved settings, using defaults');
+        if (DEBUG) { console.log('No saved settings, using defaults'); }
         return false;
     } catch (error) {
-        console.error('Failed to load settings:', error);
+        if (DEBUG) { console.error('Failed to load settings:', error); }
         return false;
     }
 }
@@ -103,7 +109,7 @@ function preloadImage(url) {
         img.src = url;
         img.onload = resolve;
         img.onerror = () => {
-            console.warn(`Failed to preload image: ${url}`);
+            if (DEBUG) { console.warn(`Failed to preload image: ${url}`); }
             resolve();
         };
     });
@@ -117,7 +123,7 @@ function preloadVideo(url) {
         video.preload = 'auto';
         video.onloadeddata = resolve;
         video.onerror = () => {
-            console.warn(`Failed to preload video: ${url}`);
+            if (DEBUG) { console.warn(`Failed to preload video: ${url}`); }
             resolve();
         };
     });
@@ -130,7 +136,7 @@ async function applyBackground(item) {
         return;
     }
 
-    console.log(`Applying background for ${item.name} with opacity: ${currentOpacity}`);
+    if (DEBUG) { console.log(`Applying background for ${item.name} with opacity: ${currentOpacity}`); }
 
     const splashUrl = centeredSplash 
         ? (item.splashPath || item.backgroundTextureLCU || item.uncenteredSplashPath)
@@ -142,14 +148,14 @@ async function applyBackground(item) {
             const currentLayer = bgContainer.querySelector('.client-bg-layer:last-child');
             if (currentLayer && parseFloat(currentLayer.style.opacity) !== currentOpacity) {
                 currentLayer.style.opacity = currentOpacity;
-                console.log(`Updated opacity to ${currentOpacity} for unchanged background: ${item.name}`);
+                if (DEBUG) { console.log(`Updated opacity to ${currentOpacity} for unchanged background: ${item.name}`); }
             }
         }
         return;
     }
 
     // Preload based on file type
-    const isVideo = splashUrl.toLowerCase().endsWith('.webm');
+    const isVideo = item.isAnimated || splashUrl.toLowerCase().endsWith('.webm');
     if (isVideo) {
         await preloadVideo(splashUrl);
     } else {
@@ -177,7 +183,7 @@ async function applyBackground(item) {
         existingLayers.forEach((layer, index) => {
             if (index < existingLayers.length - 1) {
                 layer.remove();
-                console.log(`Removed excess layer: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`);
+                if (DEBUG) { console.log(`Removed excess layer: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`); }
             }
         });
     }
@@ -204,11 +210,11 @@ async function applyBackground(item) {
         `;
         // Ensure video loads
         newBg.onloadeddata = () => {
-            console.log(`Video loaded successfully: ${splashUrl}`);
+            if (DEBUG) { console.log(`Video loaded successfully: ${splashUrl}`); }
             newBg.style.opacity = currentOpacity;
         };
         newBg.onerror = () => {
-            console.error(`Failed to load video: ${splashUrl}`);
+            if (DEBUG) { console.error(`Failed to load video: ${splashUrl}`); }
             newBg.remove();
             removeBackground();
         };
@@ -273,13 +279,13 @@ async function applyBackground(item) {
         setTimeout(() => {
             if (oldBg.parentNode) {
                 oldBg.remove();
-                console.log(`Cleaned up old layer: ${oldBg.tagName === 'VIDEO' ? oldBg.src : oldBg.style.backgroundImage}`);
+                if (DEBUG) { console.log(`Cleaned up old layer: ${oldBg.tagName === 'VIDEO' ? oldBg.src : oldBg.style.backgroundImage}`); }
             }
         }, transitionDuration * 1000 + 100);
     }
 
     lastAppliedUrl = splashUrl;
-    console.log(`Background applied: ${item.name}, URL: ${splashUrl}, Type: ${isVideo ? 'video' : 'image'}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`);
+    if (DEBUG) { console.log(`Background applied: ${item.name}, URL: ${splashUrl}, Type: ${isVideo ? 'video' : 'image'}, Opacity: ${currentOpacity}, Transition: ${transitionDuration}s`); }
 }
 
 function removeBackground() {
@@ -293,20 +299,20 @@ function removeBackground() {
                 setTimeout(() => {
                     if (layer.parentNode) {
                         layer.remove();
-                        console.log(`Removed layer during reset: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`);
+                        if (DEBUG) { console.log(`Removed layer during reset: ${layer.tagName === 'VIDEO' ? layer.src : layer.style.backgroundImage}`); }
                     }
                 }, transitionDuration * 1000 + 100);
             });
             setTimeout(() => {
                 if (bgContainer.parentNode) {
                     bgContainer.remove();
-                    console.log('Removed background container');
+                    if (DEBUG) { console.log('Removed background container'); }
                 }
             }, transitionDuration * 1000 + 100);
         }
         viewport.classList.remove('custom-background');
         lastAppliedUrl = null;
-        console.log('Background fully removed');
+        if (DEBUG) { console.log('Background fully removed'); }
     }
 }
 
@@ -338,7 +344,7 @@ function checkAndApplyBackground() {
 function setupActivityCenterObserver() {
     const activityCenterScreen = document.querySelector('.screen-root.active[data-screen-name="rcp-fe-lol-activity-center"]');
     if (!activityCenterScreen) {
-        console.log('Activity center not found for observer setup');
+        if (DEBUG) { console.log('Activity center not found for observer setup'); }
         return;
     }
 
@@ -351,13 +357,13 @@ function setupActivityCenterObserver() {
         attributeFilter: ['style', 'class']
     });
 
-    console.log('Activity center observer set up');
+    if (DEBUG) { console.log('Activity center observer set up'); }
 }
 
 function setupProfilesMainObserver() {
     const profilesMainScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-profiles-main"]');
     if (!profilesMainScreen) {
-        console.log('Profiles main screen not found for observer setup');
+        if (DEBUG) { console.log('Profiles main screen not found for observer setup'); }
         return;
     }
 
@@ -370,13 +376,13 @@ function setupProfilesMainObserver() {
         attributeFilter: ['style', 'class']
     });
 
-    console.log('Profiles main screen observer set up');
+    if (DEBUG) { console.log('Profiles main screen observer set up'); }
 }
 
 function setupPostgameObserver() {
     const postgameScreen = document.querySelector('.screen-root[data-screen-name="rcp-fe-lol-postgame"]');
     if (!postgameScreen) {
-        console.log('Postgame screen not found for observer setup');
+        if (DEBUG) { console.log('Postgame screen not found for observer setup'); }
         return;
     }
 
@@ -389,11 +395,11 @@ function setupPostgameObserver() {
         attributeFilter: ['style', 'class']
     });
 
-    console.log('Postgame screen observer set up');
+    if (DEBUG) { console.log('Postgame screen observer set up'); }
 }
 
 window.addEventListener('load', () => {
-    console.log('Pengu Loader Client Background Customizer plugin loading...');
+    if (DEBUG) { console.log('Pengu Loader Client Background Customizer plugin loading...'); }
     setupActivityCenterObserver();
     setupProfilesMainObserver();
     setupPostgameObserver();
@@ -471,7 +477,7 @@ window.addEventListener('load', () => {
                     }
                     return skins;
                 });
-                console.log('Fetched skins.json, skinData length:', skinData.length);
+                if (DEBUG) { console.log('Fetched skins.json, skinData length:', skinData.length); }
             }),
         fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/universes.json')
             .then(response => {
@@ -480,7 +486,7 @@ window.addEventListener('load', () => {
             })
             .then(data => {
                 universeData = Array.isArray(data) ? data : [];
-                console.log('Fetched universes.json, universeData length:', universeData.length);
+                if (DEBUG) { console.log('Fetched universes.json, universeData length:', universeData.length); }
             }),
         fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/skinlines.json')
             .then(response => {
@@ -489,7 +495,7 @@ window.addEventListener('load', () => {
             })
             .then(data => {
                 skinLineData = Array.isArray(data) ? data : [];
-                console.log('Fetched skinlines.json, skinLineData length:', skinLineData.length);
+                if (DEBUG) { console.log('Fetched skinlines.json, skinLineData length:', skinLineData.length); }
             }),
         fetch('https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/v1/tftrotationalshopitemdata.json')
             .then(response => {
@@ -508,20 +514,20 @@ window.addEventListener('load', () => {
                         isTFT: true
                     };
                 });
-                console.log('Fetched tftrotationalshopitemdata.json, tftData length:', tftData.length);
+                if (DEBUG) { console.log('Fetched tftrotationalshopitemdata.json, tftData length:', tftData.length); }
             })
     ])
     .then(results => {
         const errors = results.filter(r => r.status === 'rejected').map(r => r.reason);
         if (errors.length > 0) {
-            console.error('Errors during data fetch:', errors);
+            if (DEBUG) { console.error('Errors during data fetch:', errors); }
             alert('Some data failed to load. Falling back to champion grouping.');
         }
         generatePreviewGroups('champion');
         checkAndApplyBackground();
     })
     .catch(error => {
-        console.error('Unexpected error during data fetch:', error);
+        if (DEBUG) { console.error('Unexpected error during data fetch:', error); }
         alert('Failed to initialize data.');
     });
 
@@ -642,7 +648,7 @@ function createShowButton(container) {
 }
 
 function generatePreviewGroups(type) {
-    console.log('Generating preview groups for type:', type);
+    if (DEBUG) { console.log('Generating preview groups for type:', type); }
     previewGroups = [];
 
     if (type === 'champion') {
@@ -679,7 +685,7 @@ function generatePreviewGroups(type) {
         previewGroups.push(...championGroups);
     } else if (type === 'universes') {
         if (!Array.isArray(universeData) || universeData.length === 0 || !Array.isArray(skinLineData) || skinLineData.length === 0) {
-            console.warn('Universe or skinline data unavailable, falling back to champion');
+            if (DEBUG) { console.warn('Universe or skinline data unavailable, falling back to champion'); }
             generatePreviewGroups('champion');
             return;
         }
@@ -744,7 +750,7 @@ function generatePreviewGroups(type) {
         previewGroups.push(...universeGroups);
     } else if (type === 'skinlines') {
         if (!Array.isArray(skinLineData) || skinLineData.length === 0) {
-            console.warn('Skinline data unavailable, falling back to champion');
+            if (DEBUG) { console.warn('Skinline data unavailable, falling back to champion'); }
             generatePreviewGroups('champion');
             return;
         }
@@ -795,7 +801,7 @@ function generatePreviewGroups(type) {
 
         previewGroups.push(...skinLineGroups);
     } else {
-        console.warn('Invalid type, falling back to champion');
+        if (DEBUG) { console.warn('Invalid type, falling back to champion'); }
         generatePreviewGroups('champion');
     }
 
@@ -824,7 +830,363 @@ function generatePreviewGroups(type) {
         }
     }
 
-    console.log(`Generated ${previewGroups.length} preview groups for type: ${type}`);
+    // Use DataStore to fetch custom backgrounds, ensuring deleted items are not re-added
+    const customBackgrounds = DataStore.get('customBackgrounds') || [];
+    if (DEBUG) { console.log('Custom Backgrounds from DataStore:', customBackgrounds); }
+    const customGroup = {
+        title: 'Custom Background',
+        items: customBackgrounds.map(item => ({
+            name: item.name,
+            tilePath: item.tilePath,
+            splashPath: item.splashPath,
+            uncenteredSplashPath: item.uncenteredSplashPath,
+            skinLineId: null,
+            skinLineName: null,
+            isTFT: false,
+            isAnimated: item.isAnimated
+        }))
+    };
+    customGroup.items.sort((a, b) => a.name.localeCompare(b.name));
+    previewGroups.push(customGroup);
+
+    if (DEBUG) { console.log(`Generated ${previewGroups.length} preview groups for type: ${type}, Custom Backgrounds:`, customGroup); }
+}
+
+function createCustomBackgroundUI(container) {
+    const customWrapper = document.createElement('div');
+    customWrapper.id = 'client-bg-custom-ui-wrapper';
+    customWrapper.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        background: rgba(0, 0, 0, 0.7);
+    `;
+
+    const customContainer = document.createElement('div');
+    customContainer.id = 'client-bg-custom-ui';
+    customContainer.className = 'lol-custom-ui';
+    customContainer.style.cssText = `
+        width: 600px;
+        height: 550px;
+        display: flex;
+        flex-direction: column;
+        font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+        background: #010a13;
+        border: 1px solid #785a28;
+        border-radius: 4px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        box-sizing: border-box;
+        padding: 20px 0;
+    `;
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = `
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin: 0 20px;
+    `;
+
+    const title = document.createElement('h3');
+    title.textContent = 'Add Custom Background';
+    title.style.cssText = `
+        color: #f0e6d2;
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin: 0 0 20px 0;
+        text-transform: uppercase;
+    `;
+    innerContainer.appendChild(title);
+
+    const customContent = document.createElement('div');
+    customContent.style.cssText = `
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow-y: auto;
+        padding-right: 10px;
+        scrollbar-width: thin;
+        scrollbar-color: #785a28 transparent;
+    `;
+    customContent.className = 'custom-content';
+
+    const inputs = [
+        { label: 'Name', placeholder: 'Custom Background Name', key: 'name' },
+        { label: 'Tile URL', placeholder: 'Enter tile image URL (JPG)', key: 'tilePath' },
+        { label: 'Splash URL', placeholder: 'Enter splash image (JPG) or video (WebM) URL', key: 'splashPath' },
+        { label: 'Uncentered Splash URL', placeholder: 'Enter uncentered splash URL (JPG or WebM, optional)', key: 'uncenteredSplashPath' }
+    ];
+
+    const inputElements = {};
+    inputs.forEach(input => {
+        const inputWrapper = document.createElement('div');
+        inputWrapper.style.cssText = `display: flex; flex-direction: column; gap: 5px;`;
+        const label = document.createElement('label');
+        label.textContent = input.label;
+        label.style.cssText = `
+            color: #f0e6d2;
+            font-size: 14px;
+            font-weight: bold;
+        `;
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.placeholder = input.placeholder;
+        inputField.style.cssText = `
+            background: #010a13;
+            border: 1px solid #785a28;
+            color: #cdbe91;
+            padding: 8px;
+            border-radius: 2px;
+            font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+        `;
+        inputWrapper.appendChild(label);
+        inputWrapper.appendChild(inputField);
+        customContent.appendChild(inputWrapper);
+        inputElements[input.key] = inputField;
+    });
+
+    const toggleWrapper = document.createElement('div');
+    toggleWrapper.style.cssText = `display: flex; align-items: center; gap: 10px; margin-top: 10px;`;
+    const toggleLabel = document.createElement('label');
+    toggleLabel.textContent = 'Animated (Video)';
+    toggleLabel.style.cssText = `
+        color: #f0e6d2;
+        font-size: 14px;
+        font-weight: bold;
+    `;
+    const toggleSwitch = document.createElement('label');
+    toggleSwitch.className = 'toggle-switch';
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'toggle-slider';
+    toggleSwitch.appendChild(toggleInput);
+    toggleSwitch.appendChild(toggleSlider);
+    toggleWrapper.appendChild(toggleLabel);
+    toggleWrapper.appendChild(toggleSwitch);
+    customContent.appendChild(toggleWrapper);
+
+    const errorMessage = document.createElement('span');
+    errorMessage.style.cssText = `color: #ff5555; font-size: 12px; display: none; margin-top: 5px;`;
+    customContent.appendChild(errorMessage);
+
+    const addButton = document.createElement('button');
+    addButton.textContent = 'Add Background';
+    addButton.style.cssText = `
+        padding: 8px 12px;
+        background: #1e2328;
+        border: 1px solid #785a28;
+        color: #cdbe91;
+        border-radius: 2px;
+        font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+        cursor: pointer;
+        margin-top: 15px;
+    `;
+    addButton.addEventListener('mouseover', () => {
+        addButton.style.background = '#1e2328';
+        addButton.style.borderColor = '#c8aa6e';
+        addButton.style.color = '#f0e6d2';
+    });
+    addButton.addEventListener('mouseout', () => {
+        addButton.style.background = '#1e2328';
+        addButton.style.borderColor = '#785a28';
+        addButton.style.color = '#cdbe91';
+    });
+    addButton.addEventListener('click', () => {
+        try {
+            const name = inputElements.name.value.trim();
+            const tilePath = inputElements.tilePath.value.trim();
+            const splashPath = inputElements.splashPath.value.trim();
+            const uncenteredSplashPath = inputElements.uncenteredSplashPath.value.trim();
+            const isAnimated = toggleInput.checked;
+
+            if (!name || !tilePath || !splashPath) {
+                errorMessage.textContent = 'Name, Tile URL, and Splash URL are required';
+                errorMessage.style.display = 'block';
+                setTimeout(() => { errorMessage.style.display = 'none'; }, 3000);
+                return;
+            }
+
+            if (customBackgrounds.some(bg => bg.name === name)) {
+                errorMessage.textContent = 'Name already taken';
+                errorMessage.style.display = 'block';
+                setTimeout(() => { errorMessage.style.display = 'none'; }, 3000);
+                return;
+            }
+
+            if (DEBUG) { console.log('Adding custom background:', { name, tilePath, splashPath, isAnimated }); }
+            customBackgrounds = DataStore.get('customBackgrounds') || [];
+            customBackgrounds.push({
+                name,
+                tilePath,
+                splashPath,
+                uncenteredSplashPath,
+                isAnimated
+            });
+            DataStore.set('customBackgrounds', customBackgrounds);
+            saveSettings();
+            if (DEBUG) { console.log('Updated customBackgrounds:', customBackgrounds, 'DataStore:', DataStore.get('customBackgrounds')); }
+
+            // Refresh renderer like Profiles UI closeButton
+            if (DEBUG) { console.log('Custom Background UI closing, starting restore process'); }
+            customWrapper.remove();
+
+            // Find existing wrapper or clean up duplicates
+            let customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+            const existingWrappers = document.querySelectorAll('#client-bg-customizer-ui-wrapper');
+            if (existingWrappers.length > 1) {
+                if (DEBUG) { console.warn('Multiple customizer wrappers found, removing duplicates'); }
+                existingWrappers.forEach((wrapper, index) => {
+                    if (index > 0) wrapper.remove();
+                });
+                customizerWrapper = existingWrappers[0];
+            }
+
+            // Clean up duplicate backdrops
+            const existingBackdrops = document.querySelectorAll('.client-bg-customizer-backdrop');
+            if (existingBackdrops.length > 1) {
+                if (DEBUG) { console.warn('Multiple backdrops found, removing duplicates'); }
+                existingBackdrops.forEach((backdrop, index) => {
+                    if (index > 0) backdrop.remove();
+                });
+            }
+
+            if (customizerWrapper) {
+                if (DEBUG) { console.log('Customizer wrapper found, restoring visibility'); }
+                customizerWrapper.style.display = 'block';
+                const customizerUI = document.getElementById('client-bg-customizer-ui');
+                const mainWindow = customizerUI?.querySelector('.main-window');
+                if (customizerUI && mainWindow && window.renderSkins) {
+                    // Reload state from DataStore
+                    window.favoriteSkins = DataStore.get('favoriteSkins') || [];
+                    window.isFavoritesToggled = DataStore.get('favoritesToggled') || false;
+                    console.log('Restored state:', {
+                        favoriteSkinsCount: window.favoriteSkins.length,
+                        isFavoritesToggled: window.isFavoritesToggled,
+                        customBackgroundsCount: customBackgrounds.length,
+                        searchQuery: currentSearchQuery
+                    });
+
+                    // Update filter dropdown UI to ensure 'All Skins'
+                    const filterDropdown = customizerUI.querySelector('.filter-dropdown .dropdown-toggle');
+                    const filterMenu = customizerUI.querySelector('.filter-dropdown .dropdown-menu');
+                    if (filterDropdown && filterMenu) {
+                        const currentFilter = 'All Skins';
+                        filterDropdown.textContent = currentFilter;
+                        filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
+                            item.classList.toggle('selected', item.textContent === currentFilter);
+                        });
+                        if (DEBUG) { console.log(`Filter dropdown updated to: ${currentFilter}`); }
+                    } else {
+                        if (DEBUG) { console.warn('Filter dropdown or menu not found'); }
+                    }
+
+                    // Ensure previewGroups is populated with new background
+                    if (DEBUG) { console.log('Generating previewGroups for groupType: champion'); }
+                    generatePreviewGroups('champion');
+                    if (DEBUG) { console.log('Updated previewGroups:', previewGroups); }
+
+                    // Render with 'all' filter to show new background
+                    const filterValue = 'all';
+                    if (DEBUG) { console.log(`Rendering skins with filter: ${filterValue}`); }
+                    window.renderSkins(previewGroups, currentSearchQuery || '', filterValue);
+                } else {
+                    if (DEBUG) { console.warn('Customizer UI or main window missing, reinitializing'); }
+                    if (customizerWrapper) customizerWrapper.remove();
+                    const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
+                    if (existingBackdrop) existingBackdrop.remove();
+                    createClientBackgroundCustomizerUI(container);
+                }
+            } else {
+                if (DEBUG) { console.warn('Customizer wrapper not found, creating new UI'); }
+                const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
+                if (existingBackdrop) existingBackdrop.remove();
+                createClientBackgroundCustomizerUI(container);
+            }
+        } catch (error) {
+            if (DEBUG) { console.error('Error in addButton handler:', error); }
+        }
+    });
+    customContent.appendChild(addButton);
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+        .custom-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-content::-webkit-scrollbar-thumb {
+            background: #785a28;
+            border-radius: 3px;
+        }
+        .custom-content::-webkit-scrollbar-thumb:hover {
+            background: #c8aa6e;
+        }
+    `;
+    document.head.appendChild(styleSheet);
+
+    innerContainer.appendChild(customContent);
+    customContainer.appendChild(innerContainer);
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.className = 'custom-close-button';
+    closeButton.style.cssText = `
+        margin-top: 20px;
+        margin-left: auto;
+        margin-right: auto;
+        width: 50%;
+        padding: 5px 0;
+        min-height: 32px;
+        color: #cdbe91;
+        font-size: 14px;
+        font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+        font-weight: bold;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        cursor: pointer;
+        background: #1e2328;
+        border: 2px solid #785a28;
+        box-shadow: 0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13;
+        transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+    `;
+    closeButton.addEventListener('mouseover', () => {
+        closeButton.style.color = '#f0e6d2';
+        closeButton.style.borderColor = '#c8aa6e';
+        closeButton.style.boxShadow = '0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13';
+    });
+    closeButton.addEventListener('mouseout', () => {
+        closeButton.style.color = '#cdbe91';
+        closeButton.style.borderColor = '#785a28';
+        closeButton.style.boxShadow = '0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13';
+    });
+    closeButton.addEventListener('click', () => {
+        customWrapper.remove();
+        const customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+        if (customizerWrapper) {
+            customizerWrapper.style.display = 'block';
+            const customizerUI = document.getElementById('client-bg-customizer-ui');
+            if (customizerUI && window.renderSkins) {
+                generatePreviewGroups(document.querySelector('.custom-dropdown:not(.filter-dropdown):not(.sort-dropdown) .dropdown-item.selected')?.dataset.value || 'champion');
+                window.renderSkins(previewGroups, currentSearchQuery, document.querySelector('.filter-dropdown .dropdown-item.selected')?.dataset.value || 'all');
+            }
+        }
+    });
+    customContainer.appendChild(closeButton);
+
+    customWrapper.appendChild(customContainer);
+    container.appendChild(customWrapper);
 }
 
 function createProfilesUI(container) {
@@ -1016,7 +1378,7 @@ function createProfilesUI(container) {
                 cursor: pointer;
             `;
             loadButton.addEventListener('click', () => {
-                console.log(`Loading profile: ${profile.name}`);
+                if (DEBUG) { console.log(`Loading profile: ${profile.name}`); }
                 DataStore.set('favoriteSkins', profile.skins);
                 window.favoriteSkins = profile.skins || []; // Sync global state
                 window.isFavoritesToggled = DataStore.get('favoritesToggled') || false; // Load persisted filter state
@@ -1042,19 +1404,19 @@ function createProfilesUI(container) {
                             filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
                                 item.classList.toggle('selected', item.textContent === currentFilter);
                             });
-                            console.log(`Filter dropdown updated to: ${currentFilter}`);
+                            if (DEBUG) { console.log(`Filter dropdown updated to: ${currentFilter}`); }
                         } else {
-                            console.warn('Filter dropdown or menu not found');
+                            if (DEBUG) { console.warn('Filter dropdown or menu not found'); }
                         }
                         // Directly call renderSkins with the correct filter
                         const filterValue = window.isFavoritesToggled ? 'favorites' : 'all';
-                        console.log(`Rendering skins with filter: ${filterValue}`);
+                        if (DEBUG) { console.log(`Rendering skins with filter: ${filterValue}`); }
                         window.renderSkins(previewGroups, currentSearchQuery, filterValue);
                     } else {
-                        console.error('Main window or renderSkins missing');
+                        if (DEBUG) { console.error('Main window or renderSkins missing'); }
                     }
                 } else {
-                    console.error('Customizer UI not found');
+                    if (DEBUG) { console.error('Customizer UI not found'); }
                 }
             });
             const saveButton = document.createElement('button');
@@ -1225,14 +1587,14 @@ function createProfilesUI(container) {
         closeButton.style.boxShadow = 'none';
     });
     closeButton.addEventListener('click', () => {
-        console.log('Profiles UI closing, starting restore process');
+        if (DEBUG) { console.log('Profiles UI closing, starting restore process'); }
         profilesWrapper.remove();
 
         // Find existing wrapper or clean up duplicates
         let customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
         const existingWrappers = document.querySelectorAll('#client-bg-customizer-ui-wrapper');
         if (existingWrappers.length > 1) {
-            console.warn('Multiple customizer wrappers found, removing duplicates');
+            if (DEBUG) { console.warn('Multiple customizer wrappers found, removing duplicates'); }
             existingWrappers.forEach((wrapper, index) => {
                 if (index > 0) wrapper.remove();
             });
@@ -1242,14 +1604,14 @@ function createProfilesUI(container) {
         // Clean up duplicate backdrops
         const existingBackdrops = document.querySelectorAll('.client-bg-customizer-backdrop');
         if (existingBackdrops.length > 1) {
-            console.warn('Multiple backdrops found, removing duplicates');
+            if (DEBUG) { console.warn('Multiple backdrops found, removing duplicates'); }
             existingBackdrops.forEach((backdrop, index) => {
                 if (index > 0) backdrop.remove();
             });
         }
 
         if (customizerWrapper) {
-            console.log('Customizer wrapper found, restoring visibility');
+            if (DEBUG) { console.log('Customizer wrapper found, restoring visibility'); }
             customizerWrapper.style.display = 'block';
             const customizerUI = document.getElementById('client-bg-customizer-ui');
             const mainWindow = customizerUI?.querySelector('.main-window');
@@ -1272,7 +1634,7 @@ function createProfilesUI(container) {
                     if (toggledDiv) {
                         toggledDiv.classList.toggle('toggled-on', window.isFavoritesToggled);
                     }
-                    console.log('Favorites toggle updated');
+                    if (DEBUG) { console.log('Favorites toggle updated'); }
                 }
 
                 // Update filter dropdown UI
@@ -1284,12 +1646,12 @@ function createProfilesUI(container) {
                     filterMenu.querySelectorAll('.dropdown-item').forEach(item => {
                         item.classList.toggle('selected', item.textContent === currentFilter);
                     });
-                    console.log(`Filter dropdown updated to: ${currentFilter}`);
+                    if (DEBUG) { console.log(`Filter dropdown updated to: ${currentFilter}`); }
                 }
 
                 // Ensure previewGroups is populated
                 if (!previewGroups.length) {
-                    console.warn('previewGroups empty, regenerating');
+                    if (DEBUG) { console.warn('previewGroups empty, regenerating'); }
                     generatePreviewGroups('champion');
                 }
 
@@ -1310,7 +1672,7 @@ function createProfilesUI(container) {
 
                 // Render with correct filter
                 const filterValue = window.isFavoritesToggled ? 'favorites' : 'all';
-                console.log(`Rendering skins with filter: ${filterValue}`);
+                if (DEBUG) { console.log(`Rendering skins with filter: ${filterValue}`); }
                 window.renderSkins(previewGroups, currentSearchQuery, filterValue);
 
                 // Highlight selected skin
@@ -1322,13 +1684,13 @@ function createProfilesUI(container) {
                     if (selectedImage) {
                         selectedImage.classList.add('selected');
                         selectedImage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        console.log(`Highlighted selected skin: ${savedSkin.name}`);
+                        if (DEBUG) { console.log(`Highlighted selected skin: ${savedSkin.name}`); }
                     } else {
-                        console.warn(`Selected skin not found: ${savedSkin.name}`);
+                        if (DEBUG) { console.warn(`Selected skin not found: ${savedSkin.name}`); }
                     }
                 }
             } else {
-                console.warn('Customizer UI or main window missing, reinitializing');
+                if (DEBUG) { console.warn('Customizer UI or main window missing, reinitializing'); }
                 // Remove existing wrapper and backdrop to avoid duplicates
                 if (customizerWrapper) customizerWrapper.remove();
                 const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
@@ -1336,7 +1698,7 @@ function createProfilesUI(container) {
                 createClientBackgroundCustomizerUI(container);
             }
         } else {
-            console.warn('Customizer wrapper not found, creating new UI');
+            if (DEBUG) { console.warn('Customizer wrapper not found, creating new UI'); }
             // Ensure no duplicate backdrops remain
             const existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
             if (existingBackdrop) existingBackdrop.remove();
@@ -1350,10 +1712,10 @@ function createProfilesUI(container) {
 
     const customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
     if (customizerWrapper) {
-        console.log('Hiding customizer UI');
+        if (DEBUG) { console.log('Hiding customizer UI'); }
         customizerWrapper.style.display = 'none';
     } else {
-        console.warn('Customizer wrapper not found during profiles UI init');
+        if (DEBUG) { console.warn('Customizer wrapper not found during profiles UI init'); }
     }
 }
 
@@ -1649,7 +2011,7 @@ function createSettingsUI(container) {
             if (selectedSkin && selectedSkin.isTFT) {
                 DataStore.set('selectedSkin', null);
                 removeBackground();
-                console.log('Cleared selected TFT skin');
+                if (DEBUG) { console.log('Cleared selected TFT skin'); }
             }
         }
         saveSettings();
@@ -1921,47 +2283,47 @@ function createSettingsUI(container) {
         closeButton.style.boxShadow = '0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13';
     });
     closeButton.addEventListener('click', () => {
-        console.log('Close button clicked');
+        if (DEBUG) { console.log('Close button clicked'); }
         settingsWrapper.remove();
         settingsVisible = false;
         const customizerWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
         if (customizerWrapper) {
-            console.log('Restoring customizer UI');
+            if (DEBUG) { console.log('Restoring customizer UI'); }
             customizerWrapper.style.display = 'block';
             const customizerUI = document.getElementById('client-bg-customizer-ui');
             if (customizerUI) {
                 const typeDropdown = customizerUI.querySelector('.custom-dropdown:not(.filter-dropdown):not(.sort-dropdown)');
                 if (typeDropdown) {
-                    console.log('Type dropdown found');
+                    if (DEBUG) { console.log('Type dropdown found'); }
                     const typeToggle = typeDropdown.querySelector('.dropdown-toggle');
                     const typeMenu = typeDropdown.querySelector('.dropdown-menu');
                     if (typeToggle && typeMenu) {
-                        console.log('Updating dropdown to Champion');
+                        if (DEBUG) { console.log('Updating dropdown to Champion'); }
                         typeToggle.textContent = 'Champion';
                         const championItem = typeMenu.querySelector('.dropdown-item[data-value="champion"]');
                         if (championItem) {
                             typeMenu.querySelectorAll('.dropdown-item').forEach(item => item.classList.remove('selected'));
                             championItem.classList.add('selected');
-                            console.log('Simulating Champion dropdown click');
+                            if (DEBUG) { console.log('Simulating Champion dropdown click'); }
                             championItem.click();
                         }
                     }
                 } else {
-                    console.log('Type dropdown not found, falling back to manual refresh');
+                    if (DEBUG) { console.log('Type dropdown not found, falling back to manual refresh'); }
                     generatePreviewGroups('champion');
                     const mainWindow = customizerUI.querySelector('.main-window');
                     if (mainWindow && window.renderSkins) {
-                        console.log('Manually rendering skins');
+                        if (DEBUG) { console.log('Manually rendering skins'); }
                         window.renderSkins(previewGroups, currentSearchQuery);
                     } else {
-                        console.log('renderSkins not available or mainWindow not found');
+                        if (DEBUG) { console.log('renderSkins not available or mainWindow not found'); }
                     }
                 }
             } else {
-                console.log('Customizer UI not found');
+                if (DEBUG) { console.log('Customizer UI not found'); }
             }
         } else {
-            console.log('Customizer wrapper not found, recreating UI');
+            if (DEBUG) { console.log('Customizer wrapper not found, recreating UI'); }
             createClientBackgroundCustomizerUI(container);
         }
     });
@@ -1975,7 +2337,7 @@ function startShuffleCycle(favoriteSkins, isFavoritesToggled) {
     if (!cycleShuffleEnabled) return;
     if (shuffleCycleIntervalId) {
         clearInterval(shuffleCycleIntervalId);
-        console.log('Cleared previous shuffle cycle');
+        if (DEBUG) { console.log('Cleared previous shuffle cycle'); }
     }
     const tftEnabled = DataStore.get('tftEnabled') !== false;
     shuffleCycleIntervalId = setInterval(() => {
@@ -1987,7 +2349,7 @@ function startShuffleCycle(favoriteSkins, isFavoritesToggled) {
                 allItems = previewGroups.flatMap(group => 
                     group.items.filter(item => tftEnabled || !item.isTFT)
                 );
-                console.log('No valid favorites, falling back to all skins');
+                if (DEBUG) { console.log('No valid favorites, falling back to all skins'); }
             }
         } else {
             allItems = previewGroups.flatMap(group => 
@@ -1995,7 +2357,7 @@ function startShuffleCycle(favoriteSkins, isFavoritesToggled) {
             );
         }
         if (allItems.length === 0) {
-            console.log('No items available for shuffle cycle');
+            if (DEBUG) { console.log('No items available for shuffle cycle'); }
             clearInterval(shuffleCycleIntervalId);
             shuffleCycleIntervalId = null;
             return;
@@ -2008,12 +2370,13 @@ function startShuffleCycle(favoriteSkins, isFavoritesToggled) {
             uncenteredSplashPath: randomItem.uncenteredSplashPath,
             skinLineId: randomItem.skinLineId,
             skinLineName: randomItem.skinLineName,
-            isTFT: randomItem.isTFT
+            isTFT: randomItem.isTFT,
+            isAnimated: randomItem.isAnimated
         });
         applyBackground(randomItem);
-        console.log(`Shuffle cycle applied: ${randomItem.name}`);
+        if (DEBUG) { console.log(`Shuffle cycle applied: ${randomItem.name}`); }
     }, cycleInterval * 1000);
-    console.log(`Started shuffle cycle with interval ${cycleInterval} seconds`);
+    if (DEBUG) { console.log(`Started shuffle cycle with interval ${cycleInterval} seconds`); }
 }
 
 function createClientBackgroundCustomizerUI(container) {
@@ -2026,12 +2389,12 @@ function createClientBackgroundCustomizerUI(container) {
     // Remove existing wrapper and backdrop to prevent duplicates
     let existingWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
     if (existingWrapper) {
-        console.warn('Existing customizer wrapper found, removing to prevent duplicates');
+        if (DEBUG) { console.warn('Existing customizer wrapper found, removing to prevent duplicates'); }
         existingWrapper.remove();
     }
     let existingBackdrop = document.querySelector('.client-bg-customizer-backdrop');
     if (existingBackdrop) {
-        console.warn('Existing backdrop found, removing to prevent duplicates');
+        if (DEBUG) { console.warn('Existing backdrop found, removing to prevent duplicates'); }
         existingBackdrop.remove();
     }
 
@@ -2738,7 +3101,7 @@ function createClientBackgroundCustomizerUI(container) {
             item.classList.add('selected');
             selectedType = option.value;
             typeMenu.classList.remove('show');
-            console.log(`Selected type: ${selectedType}`);
+            if (DEBUG) { console.log(`Selected type: ${selectedType}`); }
             generatePreviewGroups(selectedType);
             renderSkins(previewGroups, currentSearchQuery);
         });
@@ -2852,7 +3215,7 @@ function createClientBackgroundCustomizerUI(container) {
     function renderSkins(groups, searchQuery = '', filterOverride = 'all', sortOverride = 'alphabetical') {
         const mainWindow = document.querySelector('.main-window');
         if (!mainWindow) {
-            console.error('Main window not found');
+            if (DEBUG) { console.error('Main window not found'); }
             return;
         }
 
@@ -2898,17 +3261,80 @@ function createClientBackgroundCustomizerUI(container) {
         } else {
             renderGroups.sort((a, b) => b.title.localeCompare(a.title));
             renderGroups.forEach(group => {
-                group.items.sort((a, b) => b.name.localeCompare(a.name));
+                group.items.sort((a, b) => b.name.localeCompare(b.name));
             });
         }
 
-        if (renderGroups.length === 0 && !searchQuery && selectedFilter !== 'favorites') {
-            console.warn('No groups to render, regenerating with champion grouping');
-            generatePreviewGroups('champion');
-            renderGroups = previewGroups;
+        // Ensure Custom Background group is first
+        const customGroupIndex = renderGroups.findIndex(group => group.title === 'Custom Background');
+        if (customGroupIndex !== -1) {
+            const customGroup = renderGroups.splice(customGroupIndex, 1)[0];
+            renderGroups.unshift(customGroup);
         }
 
-        renderGroups.forEach(group => {
+        if (renderGroups.length === 0 && !searchQuery && selectedFilter !== 'favorites') {
+            if (DEBUG) { console.warn('No groups to render, regenerating with champion grouping'); }
+            generatePreviewGroups('champion');
+            renderGroups = previewGroups;
+            const customGroupIndex = renderGroups.findIndex(group => group.title === 'Custom Background');
+            if (customGroupIndex !== -1) {
+                const customGroup = renderGroups.splice(customGroupIndex, 1)[0];
+                renderGroups.unshift(customGroup);
+            }
+        }
+
+        if (DEBUG) { console.log('Rendering groups:', renderGroups); }
+
+        renderGroups.forEach((group, groupIndex) => {
+            if (group.title === 'Custom Background' && groupIndex === 0) {
+                const addCustomBtn = document.createElement('button');
+                addCustomBtn.textContent = 'ADD CUSTOM BACKGROUND';
+                addCustomBtn.style.cssText = `
+                    display: block;
+                    margin: 10px auto 20px auto;
+                    padding: 5px 16px;
+                    min-width: 200px;
+                    min-height: 32px;
+                    color: #cdbe91;
+                    font-size: 14px;
+                    font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                    text-transform: uppercase;
+                    text-align: center;
+                    cursor: pointer;
+                    background: #1e2328;
+                    border: 2px solid #785a28;
+                    box-shadow: 0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13;
+                    box-sizing: border-box;
+                    transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+                `;
+                addCustomBtn.addEventListener('mouseover', () => {
+                    addCustomBtn.style.color = '#f0e6d2';
+                    addCustomBtn.style.borderColor = '#c8aa6e';
+                    addCustomBtn.style.boxShadow = '0 0 8px 4px rgba(212, 184, 117, 0.5), inset 0 0 1px 1px #010a13';
+                });
+                addCustomBtn.addEventListener('mouseout', () => {
+                    addCustomBtn.style.color = '#cdbe91';
+                    addCustomBtn.style.borderColor = '#785a28';
+                    addCustomBtn.style.boxShadow = '0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13';
+                });
+                addCustomBtn.addEventListener('click', () => {
+                    if (shuffleCycleIntervalId) {
+                        clearInterval(shuffleCycleIntervalId);
+                        shuffleCycleIntervalId = null;
+                        if (DEBUG) { console.log('Stopped shuffle cycle for custom background UI'); }
+                    }
+                    createCustomBackgroundUI(document.body);
+                    const uiWrapper = document.getElementById('client-bg-customizer-ui-wrapper');
+                    if (uiWrapper) {
+                        uiWrapper.style.display = 'none';
+                    }
+                });
+                mainWindow.appendChild(addCustomBtn);
+                if (DEBUG) { console.log('Added Add Custom button above Custom Background section'); }
+            }
+
             const groupTitle = document.createElement('div');
             groupTitle.className = 'skin-group-title';
             const titleSpan = document.createElement('span');
@@ -2925,7 +3351,7 @@ function createClientBackgroundCustomizerUI(container) {
             groupFavoriteButton.addEventListener('click', () => {
                 const isAllFavorited = group.items.every(item => favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT));
                 if (isAllFavorited) {
-                    favoriteSkins = favoriteSkins.filter(fav => !group.items.some(item => item.name === fav.name && item.isTFT === item.isTFT));
+                    favoriteSkins = favoriteSkins.filter(fav => !group.items.some(item => item.name === fav.name && item.isTFT === fav.isTFT));
                     groupFavoriteButton.classList.remove('favorited');
                     const skinButtons = groupTitle.nextElementSibling.querySelectorAll('.favorite-button');
                     skinButtons.forEach(btn => btn.classList.remove('favorited'));
@@ -2939,7 +3365,8 @@ function createClientBackgroundCustomizerUI(container) {
                                 uncenteredSplashPath: item.uncenteredSplashPath,
                                 skinLineId: item.skinLineId,
                                 skinLineName: item.skinLineName,
-                                isTFT: item.isTFT
+                                isTFT: item.isTFT,
+                                isAnimated: item.isAnimated
                             });
                         }
                     });
@@ -2948,107 +3375,207 @@ function createClientBackgroundCustomizerUI(container) {
                     skinButtons.forEach(btn => btn.classList.add('favorited'));
                 }
                 DataStore.set('favoriteSkins', favoriteSkins);
-                renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+                renderSkins(previewGroups, searchQuery, selectedFilter, sortOverride);
             });
             groupTitle.appendChild(groupFavoriteButton);
             mainWindow.appendChild(groupTitle);
 
             const skinGroup = document.createElement('div');
             skinGroup.className = 'skin-group';
-            group.items.forEach(item => {
-                const skinContainer = document.createElement('div');
-                skinContainer.className = 'skin-container';
-                skinContainer.style.position = 'relative';
 
-                const skinImage = document.createElement('div');
-                skinImage.className = 'skin-image';
-                skinImage.dataset.tilePath = item.tilePath || '';
-                skinImage.dataset.name = item.name;
-                skinImage.dataset.splashPath = item.splashPath;
-                skinImage.dataset.uncenteredSplashPath = item.uncenteredSplashPath;
-                skinImage.dataset.skinLineId = item.skinLineId || '';
-                skinImage.dataset.skinLineName = item.skinLineName || '';
-                skinImage.dataset.isTFT = item.isTFT ? 'true' : 'false';
-                skinImage.style.position = 'relative';
-                skinImage.style.boxSizing = 'border-box';
+            // Render items or placeholder for Custom Background
+            if (group.title === 'Custom Background' && group.items.length === 0) {
+                const noCustomMessage = document.createElement('div');
+                noCustomMessage.className = 'no-custom-message';
+                noCustomMessage.textContent = 'No custom backgrounds added.';
+                noCustomMessage.style.cssText = `
+                    color: #cdbe91;
+                    font-family: 'LoL Display', 'BeaufortforLOL', sans-serif;
+                    font-size: 14px;
+                    text-align: center;
+                    padding: 20px;
+                `;
+                skinGroup.appendChild(noCustomMessage);
+            } else {
+                group.items.forEach(item => {
+                    const skinContainer = document.createElement('div');
+                    skinContainer.className = 'skin-container';
+                    skinContainer.style.position = 'relative';
 
-                const handleImageError = () => {
-                    console.log(`Image failed to load for ${item.name}: ${item.tilePath}`);
-                    skinImage.className = 'skin-image failed';
-                    skinImage.style.backgroundImage = 'none';
-                    const failedText = document.createElement('div');
-                    failedText.className = 'failed-text';
-                    failedText.textContent = 'Failed to Load Preview';
-                    skinImage.appendChild(failedText);
-                };
+                    const skinImage = document.createElement('div');
+                    skinImage.className = 'skin-image';
+                    skinImage.dataset.tilePath = item.tilePath || '';
+                    skinImage.dataset.name = item.name;
+                    skinImage.dataset.splashPath = item.splashPath;
+                    skinImage.dataset.uncenteredSplashPath = item.uncenteredSplashPath;
+                    skinImage.dataset.skinLineId = item.skinLineId || '';
+                    skinImage.dataset.skinLineName = item.skinLineName || '';
+                    skinImage.dataset.isTFT = item.isTFT ? 'true' : 'false';
+                    skinImage.style.position = 'relative';
+                    skinImage.style.boxSizing = 'border-box';
 
-                if (item.tilePath) {
-                    skinImage.style.backgroundImage = `url(${item.tilePath})`;
-                    const img = new Image();
-                    img.src = item.tilePath;
-                    img.onerror = handleImageError;
-                } else {
-                    handleImageError();
-                }
-
-                if (savedSkin && savedSkin.name.trim().toLowerCase() === item.name.trim().toLowerCase() && savedSkin.isTFT === item.isTFT) {
-                    skinImage.classList.add('selected');
-                }
-                skinImage.addEventListener('click', () => {
-                    document.querySelectorAll('.skin-image').forEach(img => img.classList.remove('selected'));
-                    skinImage.classList.add('selected');
-                    const selectedSkin = {
-                        name: item.name,
-                        tilePath: item.tilePath,
-                        splashPath: item.splashPath,
-                        uncenteredSplashPath: item.uncenteredSplashPath,
-                        skinLineId: item.skinLineId,
-                        skinLineName: item.skinLineName,
-                        isTFT: item.isTFT
+                    const handleImageError = () => {
+                        if (DEBUG) { console.log(`Image failed to load for ${item.name}: ${item.tilePath}`); }
+                        skinImage.className = 'skin-image failed';
+                        skinImage.style.backgroundImage = 'none';
+                        const failedText = document.createElement('div');
+                        failedText.className = 'failed-text';
+                        failedText.textContent = 'Failed to Load Preview';
+                        skinImage.appendChild(failedText);
                     };
-                    DataStore.set('selectedSkin', selectedSkin);
-                    applyBackground(selectedSkin);
-                });
-                const skinFavoriteButton = document.createElement('button');
-                skinFavoriteButton.className = 'favorite-button';
-                if (favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT)) {
-                    skinFavoriteButton.classList.add('favorited');
-                }
-                skinFavoriteButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isFavorited = favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT);
-                    if (isFavorited) {
-                        favoriteSkins = favoriteSkins.filter(fav => !(fav.name === item.name && fav.isTFT === item.isTFT));
-                        skinFavoriteButton.classList.remove('favorited');
+
+                    if (item.tilePath) {
+                        skinImage.style.backgroundImage = `url(${item.tilePath})`;
+                        const img = new Image();
+                        img.src = item.tilePath;
+                        img.onerror = handleImageError;
                     } else {
-                        favoriteSkins.push({
+                        handleImageError();
+                    }
+
+                    if (savedSkin && savedSkin.name.trim().toLowerCase() === item.name.trim().toLowerCase() && savedSkin.isTFT === item.isTFT) {
+                        skinImage.classList.add('selected');
+                    }
+                    skinImage.addEventListener('click', () => {
+                        document.querySelectorAll('.skin-image').forEach(img => img.classList.remove('selected'));
+                        skinImage.classList.add('selected');
+                        const selectedSkin = {
                             name: item.name,
                             tilePath: item.tilePath,
                             splashPath: item.splashPath,
                             uncenteredSplashPath: item.uncenteredSplashPath,
                             skinLineId: item.skinLineId,
                             skinLineName: item.skinLineName,
-                            isTFT: item.isTFT
-                        });
+                            isTFT: item.isTFT,
+                            isAnimated: item.isAnimated
+                        };
+                        DataStore.set('selectedSkin', selectedSkin);
+                        applyBackground(selectedSkin);
+                    });
+
+                    const skinFavoriteButton = document.createElement('button');
+                    skinFavoriteButton.className = 'favorite-button';
+                    if (favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT)) {
                         skinFavoriteButton.classList.add('favorited');
                     }
-                    DataStore.set('favoriteSkins', favoriteSkins);
-                    window.favoriteSkins = favoriteSkins;
-                    const groupFavButton = skinContainer.closest('.skin-group').previousElementSibling.querySelector('.group-favorite-button');
-                    const allFavorited = group.items.every(it => favoriteSkins.some(fav => fav.name === it.name && fav.isTFT === it.isTFT));
-                    groupFavButton.classList.toggle('favorited', allFavorited);
-                    renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+                    skinFavoriteButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isFavorited = favoriteSkins.some(fav => fav.name === item.name && fav.isTFT === item.isTFT);
+                        if (isFavorited) {
+                            favoriteSkins = favoriteSkins.filter(fav => !(fav.name === item.name && fav.isTFT === fav.isTFT));
+                            skinFavoriteButton.classList.remove('favorited');
+                        } else {
+                            favoriteSkins.push({
+                                name: item.name,
+                                tilePath: item.tilePath,
+                                splashPath: item.splashPath,
+                                uncenteredSplashPath: item.uncenteredSplashPath,
+                                skinLineId: item.skinLineId,
+                                skinLineName: item.skinLineName,
+                                isTFT: item.isTFT,
+                                isAnimated: item.isAnimated
+                            });
+                            skinFavoriteButton.classList.add('favorited');
+                        }
+                        DataStore.set('favoriteSkins', favoriteSkins);
+                        window.favoriteSkins = favoriteSkins;
+                        const groupFavButton = skinContainer.closest('.skin-group').previousElementSibling.querySelector('.group-favorite-button');
+                        const allFavorited = group.items.every(it => favoriteSkins.some(fav => fav.name === it.name && fav.isTFT === it.isTFT));
+                        groupFavButton.classList.toggle('favorited', allFavorited);
+                        renderSkins(previewGroups, searchQuery, selectedFilter, sortOverride);
+                    });
+                    skinImage.appendChild(skinFavoriteButton);
+
+                    if (group.title === 'Custom Background') {
+                        const deleteButton = document.createElement('button');
+                        deleteButton.className = 'delete-button';
+                        deleteButton.innerHTML = '🗑️';
+                        deleteButton.style.cssText = `
+                            position: absolute;
+                            bottom: 5px;
+                            left: 5px;
+                            width: 24px;
+                            height: 24px;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            background: rgba(30, 35, 40, 0.8);
+                            border: 1px solid #785a28;
+                            border-radius: 4px;
+                            color: #cdbe91;
+                            font-size: 14px;
+                            cursor: pointer;
+                            transition: background 0.2s, border-color 0.2s, color 0.2s;
+                        `;
+                        deleteButton.addEventListener('mouseover', () => {
+                            deleteButton.style.background = 'rgba(30, 35, 40, 1)';
+                            deleteButton.style.borderColor = '#c8aa6e';
+                            deleteButton.style.color = '#f0e6d2';
+                        });
+                        deleteButton.addEventListener('mouseout', () => {
+                            deleteButton.style.background = 'rgba(30, 35, 40, 0.8)';
+                            deleteButton.style.borderColor = '#785a28';
+                            deleteButton.style.color = '#cdbe91';
+                        });
+
+                    deleteButton.addEventListener('click', (e) => {
+                        try {
+                            e.stopPropagation();
+                            if (DEBUG) { console.log('Attempting to delete custom background:', item.name); }
+
+                            // Find and update the Custom Background group in previewGroups
+                            const customGroupIdx = previewGroups.findIndex(g => g.title === 'Custom Background');
+                            if (customGroupIdx === -1) {
+                                if (DEBUG) { console.warn('Custom Background group not found in previewGroups'); }
+                                return;
+                            }
+                            const customGroup = previewGroups[customGroupIdx];
+                            if (DEBUG) { console.log('Before deletion - previewGroups Custom Background items:', customGroup.items); }
+
+                            // Remove the item from previewGroups
+                            customGroup.items = customGroup.items.filter(bg => bg.name !== item.name);
+                            if (DEBUG) { console.log('After deletion - previewGroups Custom Background items:', customGroup.items); }
+
+                            // Update customBackgrounds and DataStore
+                            customBackgrounds = customBackgrounds.filter(bg => bg.name !== item.name);
+                            DataStore.set('customBackgrounds', customBackgrounds);
+                            if (DEBUG) { console.log('Updated customBackgrounds:', customBackgrounds); }
+                            if (DEBUG) { console.log('DataStore after save:', DataStore.get('customBackgrounds')); }
+
+                            // Check if the deleted background is the currently selected skin
+                            const selectedSkin = DataStore.get('selectedSkin');
+                            if (selectedSkin && selectedSkin.name === item.name && selectedSkin.isTFT === item.isTFT) {
+                                DataStore.set('selectedSkin', null);
+                                removeBackground();
+                                if (DEBUG) { console.log('Cleared selectedSkin and removed background as it matched deleted item:', item.name); }
+                            }
+
+                            // Re-render UI with current filter and search query
+                            const selectedFilter = document.querySelector('.filter-dropdown .dropdown-item.selected')?.dataset.value || 'all';
+                            const selectedSort = document.querySelector('.sort-dropdown .dropdown-item.selected')?.dataset.value || 'alphabetical';
+                            if (DEBUG) { console.log('Re-rendering skins with filter:', selectedFilter); }
+                            renderSkins(previewGroups, currentSearchQuery || '', selectedFilter, selectedSort);
+
+                            // Save settings to ensure DataStore consistency
+                            saveSettings();
+                        } catch (error) {
+                            if (DEBUG) { console.error('Error in deleteButton handler:', error); }
+                        }
+                    });
+                        skinImage.appendChild(deleteButton);
+                    }
+
+                    skinContainer.appendChild(skinImage);
+
+                    const label = document.createElement('div');
+                    label.className = 'skin-label';
+                    label.textContent = item.name;
+                    skinContainer.appendChild(label);
+
+                    skinGroup.appendChild(skinContainer);
                 });
-                skinImage.appendChild(skinFavoriteButton);
-                skinContainer.appendChild(skinImage);
+            }
 
-                const label = document.createElement('div');
-                label.className = 'skin-label';
-                label.textContent = item.name;
-                skinContainer.appendChild(label);
-
-                skinGroup.appendChild(skinContainer);
-            });
             mainWindow.appendChild(skinGroup);
         });
 
@@ -3067,8 +3594,15 @@ function createClientBackgroundCustomizerUI(container) {
 
         window.addMorePreviews = (newGroups) => {
             previewGroups.push(...newGroups);
-            renderSkins(previewGroups, searchQuery, selectedFilter, selectedSort);
+            const customGroupIndex = previewGroups.findIndex(group => group.title === 'Custom Background');
+            if (customGroupIndex !== -1) {
+                const customGroup = previewGroups.splice(customGroupIndex, 1)[0];
+                previewGroups.unshift(customGroup);
+            }
+            renderSkins(previewGroups, searchQuery, selectedFilter, sortOverride);
         };
+
+        if (DEBUG) { console.log('Rendered skins, Custom Background group:', renderGroups.find(group => group.title === 'Custom Background')); }
     }
 
     uiContainer.appendChild(mainWindow);
@@ -3129,7 +3663,7 @@ function createClientBackgroundCustomizerUI(container) {
             allItems = previewGroups.flatMap(group => group.items);
         }
         if (allItems.length === 0) {
-            console.log('No items available to randomize');
+            if (DEBUG) { console.log('No items available to randomize'); }
             return;
         }
         const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
@@ -3166,7 +3700,7 @@ function createClientBackgroundCustomizerUI(container) {
         if (shuffleCycleIntervalId) {
             clearInterval(shuffleCycleIntervalId);
             shuffleCycleIntervalId = null;
-            console.log('Stopped shuffle cycle for profiles UI');
+            if (DEBUG) { console.log('Stopped shuffle cycle for profiles UI'); }
         }
         createProfilesUI(container);
     });
@@ -3202,7 +3736,7 @@ function createClientBackgroundCustomizerUI(container) {
     if (shuffleCycleIntervalId) {
         clearInterval(shuffleCycleIntervalId);
         shuffleCycleIntervalId = null;
-        console.log('Stopped existing shuffle cycle');
+        if (DEBUG) { console.log('Stopped existing shuffle cycle'); }
     }
 
     container.appendChild(backdrop);
