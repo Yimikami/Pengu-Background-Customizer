@@ -8,13 +8,18 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 |--------|----------|----------|
 | [![Main UI](Preview/Main.png)](Preview/Main.png) | [![Settings](Preview/Settings.png)](Preview/Settings.png) | [![Profiles](Preview/Profiles.png)](Preview/Profiles.png) |
 
+| Main UI (Alternate) | Shuffle Settings | Custom Backgrounds |
+|---------------------|------------------|---------------------|
+| [![Main UI](Preview/Main2.png)](Preview/Main2.png) | [![Shuffle Settings](Preview/ShuffleSettings.png)](Preview/ShuffleSettings.png) | [![Custom Background](Preview/CustomBackground.png)](Preview/CustomBackground.png) |
+
 ## Features
 
-- Set backgrounds from champion skins, universes, skinlines, or TFT companions.
-- Save favorite skins and create profiles for quick switching.
-- Randomize backgrounds or cycle them automatically (10–300s intervals).
-- Search and filter by champion, universe, skinline, or name.
+- Set backgrounds from champion skins, universes, skinlines, TFT companions, or custom-uploaded images/videos.
+- Save favorite skins and create profiles for quick background switching.
+- Randomize backgrounds or enable automatic shuffle cycling (10–300s intervals).
+- Search and filter backgrounds by champion, universe, skinline, or name.
 - Adjust opacity (0.1–1.0), transition duration (0–5s), and toggle centered splash or TFT content.
+- Add custom backgrounds with support for JPG, PNG, GIF, and WebM formats (up to 10MB for images, 20MB for videos).
 - Clean, League-inspired UI optimized for the Acrylic League Theme.
 
 ## Installation
@@ -33,11 +38,12 @@ A Pengu Loader plugin to customize the League of Legends client with dynamic bac
 
 ## Usage
 
-- **Open**: In the lobby, click the “BGC” button (hover left to reveal).
-- **Choose Background**: Search or filter skins, select and press “Confirm”.
-- **Settings**: Click the cog icon to adjust opacity, transitions, or enable auto-cycling.
-- **Profiles**: Use the “PROFILES” button to save or load skin sets.
-- **Shuffle**: Click “Shuffle” for a random background or enable cycling in settings.
+- **Open**: In the lobby, hover left to reveal the “BGC” button and click to open the customizer.
+- **Choose Background**: Search or filter skins by champion, universe, skinline, or favorites, then select a skin and click “Confirm”.
+- **Add Custom Background**: In the “Custom Background” section, click “ADD CUSTOM BACKGROUND” to upload a JPG, PNG, GIF (≤10MB), or WebM video (≤20MB).
+- **Settings**: Click the cog icon to adjust opacity (0.1–1.0), transition duration (0–5s), centered splash, TFT content, or enable auto-cycling (10–300s intervals).
+- **Profiles**: Click “PROFILES” to save, load, or manage skin sets.
+- **Shuffle**: Click “Shuffle” for a random background or enable auto-cycling in settings for periodic shuffling.
 
 ## Compatibility
 
