@@ -154,15 +154,94 @@ function preloadImage(url) {
 function preloadVideo(url) {
   return new Promise((resolve) => {
     if (!url) return resolve();
-    const video = document.createElement("video");
-    video.src = url;
-    video.preload = "auto";
-    video.onloadeddata = resolve;
-    video.onerror = () => {
-      if (DEBUG) {
-        console.warn(`Failed to preload video: ${url}`);
+
+    // For data URLs, especially WebM, try to convert to blob URL first
+    let videoSrc = url;
+    let blobUrl = null;
+
+    if (url.startsWith("data:video/webm")) {
+      try {
+        const arr = url.split(",");
+        if (arr.length >= 2) {
+          const mime = arr[0].match(/:(.*?);/)[1];
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+
+          const blob = new Blob([u8arr], { type: mime });
+          blobUrl = URL.createObjectURL(blob);
+          videoSrc = blobUrl;
+
+          if (DEBUG) {
+            console.log("Created blob URL for video preloading");
+          }
+        }
+      } catch (e) {
+        if (DEBUG) {
+          console.warn(
+            "Failed to create blob URL for preloading, using data URL directly:",
+            e
+          );
+        }
       }
-      resolve();
+    }
+
+    const video = document.createElement("video");
+    video.muted = true;
+    video.preload = "auto";
+
+    // Set up event handlers before setting src
+    let resolved = false;
+    const markResolved = () => {
+      if (!resolved) {
+        resolved = true;
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+          if (DEBUG) {
+            console.log("Revoked preload blob URL");
+          }
+        }
+        resolve();
+      }
+    };
+
+    video.onloadeddata = markResolved;
+
+    video.onerror = (e) => {
+      if (DEBUG) {
+        console.warn(`Failed to preload video: ${url.substring(0, 50)}...`, e);
+      }
+      markResolved();
+    };
+
+    // Add a timeout to prevent hanging
+    setTimeout(() => {
+      if (!resolved) {
+        if (DEBUG) {
+          console.warn("Video preload timeout, continuing anyway");
+        }
+        markResolved();
+      }
+    }, 5000); // 5 second timeout
+
+    // Now set the src to start loading
+    video.src = videoSrc;
+
+    // Also resolve on metadata as a fallback
+    video.onloadedmetadata = () => {
+      // Wait a bit to see if onloadeddata fires
+      setTimeout(() => {
+        if (!resolved) {
+          if (DEBUG) {
+            console.log("Video preload resolved on metadata timeout");
+          }
+          markResolved();
+        }
+      }, 1000);
     };
   });
 }
@@ -205,12 +284,49 @@ async function applyBackground(item) {
     return;
   }
 
-  // Preload based on file type
-  const isVideo = item.isAnimated || splashUrl.toLowerCase().endsWith(".webm");
-  if (isVideo) {
-    await preloadVideo(splashUrl);
-  } else {
-    await preloadImage(splashUrl);
+  // Determine if this is a video
+  const isVideo =
+    item.isAnimated ||
+    splashUrl.toLowerCase().endsWith(".webm") ||
+    splashUrl.includes("data:video/");
+
+  // Add retry mechanism for videos
+  let preloadSuccess = false;
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  while (!preloadSuccess && retryCount < maxRetries) {
+    try {
+      if (isVideo) {
+        if (DEBUG) {
+          console.log(
+            `Preloading video (attempt ${
+              retryCount + 1
+            }): ${splashUrl.substring(0, 50)}...`
+          );
+        }
+        await preloadVideo(splashUrl);
+        preloadSuccess = true;
+      } else {
+        await preloadImage(splashUrl);
+        preloadSuccess = true;
+      }
+    } catch (error) {
+      retryCount++;
+      if (DEBUG) {
+        console.warn(`Preload attempt ${retryCount} failed:`, error);
+      }
+      // Short delay before retry
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  if (!preloadSuccess && isVideo) {
+    if (DEBUG) {
+      console.warn(
+        "Video preload failed after retries, will attempt direct loading"
+      );
+    }
   }
 
   let bgContainer = document.getElementById("client-bg-container");
@@ -251,7 +367,6 @@ async function applyBackground(item) {
   if (isVideo) {
     newBg = document.createElement("video");
     newBg.className = "client-bg-layer";
-    newBg.src = splashUrl;
     newBg.loop = true;
     newBg.muted = true;
     newBg.autoplay = true;
@@ -267,20 +382,117 @@ async function applyBackground(item) {
             opacity: 0;
             transition: opacity ${transitionDuration}s ease;
         `;
-    // Ensure video loads
+
+    // Set up event handlers before setting src to avoid race conditions
     newBg.onloadeddata = () => {
       if (DEBUG) {
-        console.log(`Video loaded successfully: ${splashUrl}`);
+        console.log(
+          `Video loaded successfully: ${splashUrl.substring(0, 50)}...`
+        );
       }
       newBg.style.opacity = currentOpacity;
-    };
-    newBg.onerror = () => {
-      if (DEBUG) {
-        console.error(`Failed to load video: ${splashUrl}`);
+
+      // Ensure video is playing (sometimes autoplay doesn't work on restart)
+      try {
+        const playPromise = newBg.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            if (DEBUG) {
+              console.warn("Video play failed, retrying:", error);
+            }
+            // Try again after a short delay
+            setTimeout(() => {
+              newBg.play().catch((e) => {
+                if (DEBUG) console.error("Second play attempt failed:", e);
+              });
+            }, 1000);
+          });
+        }
+      } catch (e) {
+        if (DEBUG) console.error("Error during video play:", e);
       }
-      newBg.remove();
-      removeBackground();
     };
+
+    newBg.onerror = (e) => {
+      if (DEBUG) {
+        console.error(
+          `Failed to load video: ${splashUrl.substring(0, 50)}...`,
+          e
+        );
+      }
+
+      // Try to recover by creating a fallback element
+      try {
+        const fallbackBg = document.createElement("div");
+        fallbackBg.className = "client-bg-layer fallback";
+        fallbackBg.style.cssText = `
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: #010a13;
+          opacity: 0;
+          transition: opacity ${transitionDuration}s ease;
+        `;
+
+        // Add a text indicator that video failed
+        const fallbackText = document.createElement("div");
+        fallbackText.textContent = "Video background failed to load";
+        fallbackText.style.cssText = `
+          position: absolute;
+          bottom: 20px;
+          right: 20px;
+          color: #785a28;
+          font-size: 14px;
+          padding: 5px 10px;
+          background: rgba(1, 10, 19, 0.7);
+          border: 1px solid #785a28;
+          border-radius: 2px;
+        `;
+        fallbackBg.appendChild(fallbackText);
+
+        // Replace the video element with our fallback
+        if (newBg.parentNode) {
+          newBg.parentNode.replaceChild(fallbackBg, newBg);
+          setTimeout(() => {
+            fallbackBg.style.opacity = currentOpacity;
+          }, 50);
+        }
+      } catch (fallbackError) {
+        if (DEBUG) console.error("Failed to create fallback:", fallbackError);
+        if (newBg.parentNode) newBg.remove();
+        removeBackground();
+      }
+    };
+
+    // Now set the src to start loading
+    try {
+      // For data URLs, try to handle them specially
+      if (splashUrl.startsWith("data:video/")) {
+        // For WebM specifically, we need to ensure proper MIME type
+        if (splashUrl.includes("data:video/webm")) {
+          const blob = dataURLtoBlob(splashUrl);
+          if (blob) {
+            const blobUrl = URL.createObjectURL(blob);
+            newBg.src = blobUrl;
+
+            // Store the blob URL to revoke it later
+            newBg.dataset.blobUrl = blobUrl;
+          } else {
+            // Fallback to direct assignment if blob creation fails
+            newBg.src = splashUrl;
+          }
+        } else {
+          newBg.src = splashUrl;
+        }
+      } else {
+        newBg.src = splashUrl;
+      }
+    } catch (srcError) {
+      if (DEBUG) console.error("Error setting video src:", srcError);
+      newBg.src = splashUrl; // Fallback to direct assignment
+    }
   } else {
     newBg = document.createElement("div");
     newBg.className = "client-bg-layer";
@@ -297,6 +509,28 @@ async function applyBackground(item) {
             opacity: 0;
             transition: opacity ${transitionDuration}s ease;
         `;
+  }
+
+  // Helper function to convert data URL to Blob
+  function dataURLtoBlob(dataurl) {
+    try {
+      const arr = dataurl.split(",");
+      if (arr.length < 2) return null;
+
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+
+      return new Blob([u8arr], { type: mime });
+    } catch (e) {
+      if (DEBUG) console.error("Failed to convert data URL to blob:", e);
+      return null;
+    }
   }
 
   bgContainer.appendChild(newBg);
@@ -341,12 +575,30 @@ async function applyBackground(item) {
     oldBg.style.opacity = 0;
     setTimeout(() => {
       if (oldBg.parentNode) {
+        // Clean up blob URLs to prevent memory leaks
+        if (
+          oldBg.tagName === "VIDEO" &&
+          oldBg.dataset &&
+          oldBg.dataset.blobUrl
+        ) {
+          try {
+            URL.revokeObjectURL(oldBg.dataset.blobUrl);
+            if (DEBUG) {
+              console.log(`Revoked blob URL: ${oldBg.dataset.blobUrl}`);
+            }
+          } catch (e) {
+            if (DEBUG) {
+              console.error("Failed to revoke blob URL:", e);
+            }
+          }
+        }
+
         oldBg.remove();
         if (DEBUG) {
           console.log(
             `Cleaned up old layer: ${
               oldBg.tagName === "VIDEO"
-                ? oldBg.src
+                ? oldBg.src.substring(0, 50) + "..."
                 : oldBg.style.backgroundImage
             }`
           );
@@ -375,12 +627,47 @@ function removeBackground() {
         layer.style.opacity = 0;
         setTimeout(() => {
           if (layer.parentNode) {
+            // Clean up blob URLs to prevent memory leaks
+            if (
+              layer.tagName === "VIDEO" &&
+              layer.dataset &&
+              layer.dataset.blobUrl
+            ) {
+              try {
+                URL.revokeObjectURL(layer.dataset.blobUrl);
+                if (DEBUG) {
+                  console.log(
+                    `Revoked blob URL during reset: ${layer.dataset.blobUrl}`
+                  );
+                }
+              } catch (e) {
+                if (DEBUG) {
+                  console.error("Failed to revoke blob URL during reset:", e);
+                }
+              }
+            }
+
+            // For videos, pause them before removal to free up resources
+            if (layer.tagName === "VIDEO") {
+              try {
+                layer.pause();
+                layer.src = "";
+                layer.load(); // Forces the browser to release resources
+              } catch (e) {
+                if (DEBUG) {
+                  console.error("Error cleaning up video:", e);
+                }
+              }
+            }
+
             layer.remove();
             if (DEBUG) {
               console.log(
                 `Removed layer during reset: ${
                   layer.tagName === "VIDEO"
                     ? layer.src
+                      ? layer.src.substring(0, 50) + "..."
+                      : "empty src"
                     : layer.style.backgroundImage
                 }`
               );
